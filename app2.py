@@ -373,6 +373,37 @@ def main():
         white-space: nowrap;
         box-shadow: 0 2px 8px rgba(0,0,0,0.5);
     }}
+
+    /* --- NUEVO: Pantalla de quiniela cerrada --- */
+    #pantalla-cerrada {{
+        position: fixed;
+        top: 0; left: 0;
+        width: 100%; height: 100%;
+        background-color: rgba(14, 17, 23, 0.95);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        z-index: 10001; /* por encima de todo */
+        color: white;
+        text-align: center;
+    }}
+    .contenedor-cerrado {{
+        background-color: #161b22;
+        border: 1px solid #ff3333;
+        border-radius: 14px;
+        padding: 45px 35px;
+        max-width: 500px;
+        box-shadow: 0 12px 35px rgba(0, 0, 0, 0.7);
+    }}
+    .contenedor-cerrado h2 {{
+        font-size: 24px;
+        margin-bottom: 20px;
+    }}
+    .contenedor-cerrado p {{
+        font-size: 16px;
+        color: #8b949e;
+    }}
     
     /* 1. IMPORTAR LA FUENTE ROBOTO DESDE GOOGLE FONTS */
     @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap');
@@ -858,6 +889,14 @@ def main():
     </style>
     </head>
     <body>
+
+    <!-- PANTALLA DE QUINIELA CERRADA -->
+    <div id="pantalla-cerrada">
+        <div class="contenedor-cerrado">
+            <h2>ESTA QUINIELA SE HA CERRADO</h2>
+            <p>Los resultados aparecerán en esta misma página a partir del día lunes 29 De Junio del 2026 al término del día.</p>
+        </div>
+    </div>
     
     <div id="loader-container">
         <div class="spinner"></div>
@@ -1407,8 +1446,8 @@ def main():
         console.log("Enviando a Supabase...");
         console.log(JSON.stringify(filas, null, 2));
 
-        var SUPABASE_URL = "{st.secrets['SUPABASE_URL']}";
-        var SUPABASE_ANON_KEY = "{st.secrets['SUPABASE_KEY']}";
+        var SUPABASE_URL = "https://ubnxgjhvyqvqrmybalkg.supabase.co";
+        var SUPABASE_ANON_KEY = "sb_publishable_ffGHwrBMZojB9_ZEY32YEw_Y2SPVz9C";
 
         try {{
             var response = await fetch(SUPABASE_URL + "/rest/v1/Quiniela_Fase2", {{
