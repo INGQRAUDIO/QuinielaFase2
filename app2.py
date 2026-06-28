@@ -23,7 +23,7 @@ st.markdown(
 
 @st.cache_data
 def cargar_banderas():
-    banderas_path = "banderas"
+    banderas_path = "Banderas"
     banderas_base64_dict = {}
     if os.path.exists(banderas_path):
         banderas = [f for f in os.listdir(banderas_path) if f.endswith('.svg')]
