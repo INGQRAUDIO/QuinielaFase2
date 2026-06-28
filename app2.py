@@ -416,7 +416,6 @@ def main():
         justify-content: center;
         gap: 40px;
         width: 100%;
-        min-width: 1400px;
         min-height: calc(100vh - 120px);
         position: relative;
     }}
