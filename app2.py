@@ -37,7 +37,7 @@ def cargar_banderas():
 
 
 def main():
-    banderas_path = "banderas"
+    banderas_path = "Banderas"
     banderas = []
     if os.path.exists(banderas_path):
         banderas = [f for f in os.listdir(banderas_path) if f.endswith('.svg')]
