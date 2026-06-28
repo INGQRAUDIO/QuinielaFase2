@@ -323,8 +323,24 @@ def main():
         font-family: 'Roboto', sans-serif;
     }}
     
-    html, body {{ width: 100%; min-height: 100vh; background-color: #0E1117; overflow: auto;}}
+    html, body {{ width: 100%; 
+        height: 100%; 
+        background-color: #0E1117; 
+        overflow: hidden; /* Evita que el navegador móvil colapse */
+        margin: 0;
+        padding: 0;}}
+        
     body {{ padding: 20px; }}
+    
+    
+    #contenedor-master {{
+        width: 100%;
+        height: 100vh;
+        overflow: auto;
+        -webkit-overflow-scrolling: touch; /* Activa el scroll suave en iOS y Android */
+        padding: 20px;
+    }}
+    
 
     /* PANTALLA DE BIENVENIDA */
     #pantalla-bienvenida {{
@@ -416,6 +432,7 @@ def main():
         justify-content: center;
         gap: 40px;
         width: 100%;
+        min-width: 1400px;
         min-height: calc(100vh - 120px);
         position: relative;
     }}
@@ -768,142 +785,147 @@ def main():
         <div class="spinner"></div>
     </div>
 
-    <!-- PANTALLA DE BIENVENIDA -->
-    <div id="pantalla-bienvenida">
-        <div class="contenedor-bienvenida" id="paso-1">
-            <h1 style="margin-bottom: 12px; font-size: 24px;">Quiniela 90.9 // Fase 2</h1>
-            <p style="color: #8b949e; font-size: 14px; margin-bottom: 25px; line-height: 1.5;">Por favor ingresa tu nombre para comenzar :)</p>
-            <input type="text" id="input-nombre" placeholder="Ingresa tu nombre" autocomplete="off" style="margin-bottom: 25px; width: 100%; box-sizing: border-box;">
-            <button onclick="irAPaso2()" style="width: 100%;">SIGUIENTE</button>
+    
+    <div id="contenedor-master">
+
+
+        <!-- PANTALLA DE BIENVENIDA -->
+        <div id="pantalla-bienvenida">
+            <div class="contenedor-bienvenida" id="paso-1">
+                <h1 style="margin-bottom: 12px; font-size: 24px;">Quiniela 90.9 // Fase 2</h1>
+                <p style="color: #8b949e; font-size: 14px; margin-bottom: 25px; line-height: 1.5;">Por favor ingresa tu nombre para comenzar :)</p>
+                <input type="text" id="input-nombre" placeholder="Ingresa tu nombre" autocomplete="off" style="margin-bottom: 25px; width: 100%; box-sizing: border-box;">
+                <button onclick="irAPaso2()" style="width: 100%;">SIGUIENTE</button>
+            </div>
+            <div class="contenedor-bienvenida" id="paso-2" style="display: none; opacity: 0;">
+                <h1 style="margin-bottom: 12px; font-size: 24px;">Instrucciones</h1>
+                <ul style="color: #8b949e; font-size: 14px; margin-bottom: 25px; line-height: 1.6; text-align: left; padding-left: 20px;">
+                    <li><strong></strong> Selecciona los equipos ganadores haciendo clic en los espacios vacíos de cada llave.</li>
+                    <li><strong></strong> Una vez elegida la bandera, ingresa los goles del equipo en el recuadro que aparecerá debajo.</li>
+                    <li><strong></strong> Continúa este proceso hasta llegar al recuadro central del Campeón.</li>
+                    <li><strong></strong> Importante: Sigue las llaves correctamente.</li>
+                    <li><strong></strong> Al finalizar, haz clic en el botón verde "LISTO!!".</li>
+                </ul>
+                <button onclick="iniciarApp()" style="width: 100%;">COMENZAR</button>
+            </div>
         </div>
-        <div class="contenedor-bienvenida" id="paso-2" style="display: none; opacity: 0;">
-            <h1 style="margin-bottom: 12px; font-size: 24px;">Instrucciones</h1>
-            <ul style="color: #8b949e; font-size: 14px; margin-bottom: 25px; line-height: 1.6; text-align: left; padding-left: 20px;">
-                <li><strong></strong> Selecciona los equipos ganadores haciendo clic en los espacios vacíos de cada llave.</li>
-                <li><strong></strong> Una vez elegida la bandera, ingresa los goles del equipo en el recuadro que aparecerá debajo.</li>
-                <li><strong></strong> Continúa este proceso hasta llegar al recuadro central del Campeón.</li>
-                <li><strong></strong> Importante: Sigue las llaves correctamente.</li>
-                <li><strong></strong> Al finalizar, haz clic en el botón verde "LISTO!!".</li>
-            </ul>
-            <button onclick="iniciarApp()" style="width: 100%;">COMENZAR</button>
+
+        <div id="layout-principal">
+            <div class="lado-izquierdo">
+                <div class="grupo-superior-izquierdo">
+                    <div class="columna"> {html_izquierda_1} </div>
+                    <div class="vs-separator"><span class="vs-texto">VS</span></div>
+                    <div class="columna"> {html_izquierda_2} </div>
+                    <div class="columna"> {html_izquierda_3} </div>
+                    <div class="conector-a13">
+                        <svg viewBox="0 0 55 300" preserveAspectRatio="none">
+                            <line x1="0" y1="70" x2="55" y2="70" stroke="white" stroke-width="2" />
+                        </svg>
+                    </div>
+                    <div class="conector-a14">
+                        <svg viewBox="0 0 55 300" preserveAspectRatio="none">
+                            <line x1="0" y1="220" x2="55" y2="220" stroke="white" stroke-width="2" />
+                        </svg>
+                    </div>
+                    <div class="columna-desalineada">
+                        {html_a13}
+                        <div class="conector-a13-a14"></div>
+                        <div class="conector-a15-horizontal"></div>
+                        <div class="espaciador-a14"> {html_a14} </div>
+                    </div>
+                    <div class="columna-a15"> {html_a15} </div>
+                </div>
+                <div class="conector-a15-c15"></div>
+                <div class="conector-s1-horizontal"></div>
+                <div class="grupo-inferior-izquierdo">
+                    <div class="columna"> {html_izquierda_4} </div>
+                    <div class="vs-separator"><span class="vs-texto">VS</span></div>
+                    <div class="columna"> {html_izquierda_5} </div>
+                    <div class="columna"> {html_izquierda_6} </div>
+                    <div class="conector-c13">
+                        <svg viewBox="0 0 55 300" preserveAspectRatio="none">
+                            <line x1="0" y1="70" x2="55" y2="70" stroke="white" stroke-width="2" />
+                        </svg>
+                    </div>
+                    <div class="conector-c14">
+                        <svg viewBox="0 0 55 300" preserveAspectRatio="none">
+                            <line x1="0" y1="220" x2="55" y2="220" stroke="white" stroke-width="2" />
+                        </svg>
+                    </div>
+                    <div class="columna-desalineada">
+                        {html_c13}
+                        <div class="conector-c13-c14"></div>
+                        <div class="conector-c15-horizontal"></div>
+                        <div class="espaciador-a14"> {html_c14} </div>
+                    </div>
+                    <div class="columna-c15"> {html_c15} </div>
+                </div>
+            </div>
+            
+            <div class="conector-s1-s2"></div>
+            <div class="conector-w1-vertical"></div>
+
+            <div class="columna-s1"> {html_s1} </div>
+            <div class="columna-w1"> {html_w1} </div>
+            <div class="columna-s2"> {html_s2} </div>
+
+            <div class="lado-derecho">
+                <div class="grupo-superior-derecho">
+                    <div class="columna-b15"> {html_b15} </div>
+                    <div class="columna-derecha-desalineada">
+                        {html_b13}
+                        <div class="conector-b13-b14"></div>
+                        <div class="conector-b15-horizontal"></div>
+                        <div class="conector-s2-horizontal"></div>
+                        <div class="espaciador-a14"> {html_b14} </div>
+                    </div>
+                    <div class="conector-b13">
+                        <svg viewBox="0 0 55 300" preserveAspectRatio="none">
+                            <line x1="55" y1="70" x2="0" y2="70" stroke="white" stroke-width="2" />
+                        </svg>
+                    </div>
+                    <div class="conector-b14">
+                        <svg viewBox="0 0 55 300" preserveAspectRatio="none">
+                            <line x1="55" y1="220" x2="0" y2="220" stroke="white" stroke-width="2" />
+                        </svg>
+                    </div>
+                    <div class="columna-derecha"> {html_derecha_3} </div>
+                    <div class="columna-derecha"> {html_derecha_2} </div>
+                    <div class="vs-separator"><span class="vs-texto">VS</span></div>
+                    <div class="columna-derecha"> {html_derecha_1} </div>
+                </div>
+                <div class="conector-b15-d15"></div>
+                <div class="grupo-inferior-derecho">
+                    <div class="columna-d15"> {html_d15} </div>
+                    <div class="columna-derecha-desalineada">
+                        {html_d13}
+                        <div class="conector-d13-d14"></div>
+                        <div class="conector-d15-horizontal"></div>
+                        <div class="espaciador-a14"> {html_d14} </div>
+                    </div>
+                    <div class="conector-d13">
+                        <svg viewBox="0 0 55 300" preserveAspectRatio="none">
+                            <line x1="55" y1="70" x2="0" y2="70" stroke="white" stroke-width="2" />
+                        </svg>
+                    </div>
+                    <div class="conector-d14">
+                        <svg viewBox="0 0 55 300" preserveAspectRatio="none">
+                            <line x1="55" y1="220" x2="0" y2="220" stroke="white" stroke-width="2" />
+                        </svg>
+                    </div>
+                    <div class="columna-derecha"> {html_derecha_6} </div>
+                    <div class="columna-derecha"> {html_derecha_5} </div>
+                    <div class="vs-separator"><span class="vs-texto">VS</span></div>
+                    <div class="columna-derecha"> {html_derecha_4} </div>
+                </div>
+            </div>
         </div>
+
+        <button id="boton-enviar" onclick="enviarDatos()">LISTO!!</button>
+        <div class="mensaje-exito" id="mensaje-exito">¡Datos enviados correctamente!</div>
+        <div id="mensaje-terminal"></div>
+
     </div>
-
-    <div id="layout-principal">
-        <div class="lado-izquierdo">
-            <div class="grupo-superior-izquierdo">
-                <div class="columna"> {html_izquierda_1} </div>
-                <div class="vs-separator"><span class="vs-texto">VS</span></div>
-                <div class="columna"> {html_izquierda_2} </div>
-                <div class="columna"> {html_izquierda_3} </div>
-                <div class="conector-a13">
-                    <svg viewBox="0 0 55 300" preserveAspectRatio="none">
-                        <line x1="0" y1="70" x2="55" y2="70" stroke="white" stroke-width="2" />
-                    </svg>
-                </div>
-                <div class="conector-a14">
-                    <svg viewBox="0 0 55 300" preserveAspectRatio="none">
-                        <line x1="0" y1="220" x2="55" y2="220" stroke="white" stroke-width="2" />
-                    </svg>
-                </div>
-                <div class="columna-desalineada">
-                    {html_a13}
-                    <div class="conector-a13-a14"></div>
-                    <div class="conector-a15-horizontal"></div>
-                    <div class="espaciador-a14"> {html_a14} </div>
-                </div>
-                <div class="columna-a15"> {html_a15} </div>
-            </div>
-            <div class="conector-a15-c15"></div>
-            <div class="conector-s1-horizontal"></div>
-            <div class="grupo-inferior-izquierdo">
-                <div class="columna"> {html_izquierda_4} </div>
-                <div class="vs-separator"><span class="vs-texto">VS</span></div>
-                <div class="columna"> {html_izquierda_5} </div>
-                <div class="columna"> {html_izquierda_6} </div>
-                <div class="conector-c13">
-                    <svg viewBox="0 0 55 300" preserveAspectRatio="none">
-                        <line x1="0" y1="70" x2="55" y2="70" stroke="white" stroke-width="2" />
-                    </svg>
-                </div>
-                <div class="conector-c14">
-                    <svg viewBox="0 0 55 300" preserveAspectRatio="none">
-                        <line x1="0" y1="220" x2="55" y2="220" stroke="white" stroke-width="2" />
-                    </svg>
-                </div>
-                <div class="columna-desalineada">
-                    {html_c13}
-                    <div class="conector-c13-c14"></div>
-                    <div class="conector-c15-horizontal"></div>
-                    <div class="espaciador-a14"> {html_c14} </div>
-                </div>
-                <div class="columna-c15"> {html_c15} </div>
-            </div>
-        </div>
-        
-        <div class="conector-s1-s2"></div>
-        <div class="conector-w1-vertical"></div>
-
-        <div class="columna-s1"> {html_s1} </div>
-        <div class="columna-w1"> {html_w1} </div>
-        <div class="columna-s2"> {html_s2} </div>
-
-        <div class="lado-derecho">
-            <div class="grupo-superior-derecho">
-                <div class="columna-b15"> {html_b15} </div>
-                <div class="columna-derecha-desalineada">
-                    {html_b13}
-                    <div class="conector-b13-b14"></div>
-                    <div class="conector-b15-horizontal"></div>
-                    <div class="conector-s2-horizontal"></div>
-                    <div class="espaciador-a14"> {html_b14} </div>
-                </div>
-                <div class="conector-b13">
-                    <svg viewBox="0 0 55 300" preserveAspectRatio="none">
-                        <line x1="55" y1="70" x2="0" y2="70" stroke="white" stroke-width="2" />
-                    </svg>
-                </div>
-                <div class="conector-b14">
-                    <svg viewBox="0 0 55 300" preserveAspectRatio="none">
-                        <line x1="55" y1="220" x2="0" y2="220" stroke="white" stroke-width="2" />
-                    </svg>
-                </div>
-                <div class="columna-derecha"> {html_derecha_3} </div>
-                <div class="columna-derecha"> {html_derecha_2} </div>
-                <div class="vs-separator"><span class="vs-texto">VS</span></div>
-                <div class="columna-derecha"> {html_derecha_1} </div>
-            </div>
-            <div class="conector-b15-d15"></div>
-            <div class="grupo-inferior-derecho">
-                <div class="columna-d15"> {html_d15} </div>
-                <div class="columna-derecha-desalineada">
-                    {html_d13}
-                    <div class="conector-d13-d14"></div>
-                    <div class="conector-d15-horizontal"></div>
-                    <div class="espaciador-a14"> {html_d14} </div>
-                </div>
-                <div class="conector-d13">
-                    <svg viewBox="0 0 55 300" preserveAspectRatio="none">
-                        <line x1="55" y1="70" x2="0" y2="70" stroke="white" stroke-width="2" />
-                    </svg>
-                </div>
-                <div class="conector-d14">
-                    <svg viewBox="0 0 55 300" preserveAspectRatio="none">
-                        <line x1="55" y1="220" x2="0" y2="220" stroke="white" stroke-width="2" />
-                    </svg>
-                </div>
-                <div class="columna-derecha"> {html_derecha_6} </div>
-                <div class="columna-derecha"> {html_derecha_5} </div>
-                <div class="vs-separator"><span class="vs-texto">VS</span></div>
-                <div class="columna-derecha"> {html_derecha_4} </div>
-            </div>
-        </div>
-    </div>
-
-    <button id="boton-enviar" onclick="enviarDatos()">LISTO!!</button>
-    <div class="mensaje-exito" id="mensaje-exito">¡Datos enviados correctamente!</div>
-    <div id="mensaje-terminal"></div>
-
     <script>
     var datosRectangulos = {{}};
     var HERENCIA_FIJA = {herencia_fija_js};
@@ -935,7 +957,7 @@ def main():
     }}
     
     // Lógica para ocultar el loader cuando la página cargue totalmente
-    window.addEventListener('load', function() {{
+    setTimeout(function() {{
         var loader = document.getElementById('loader-container');
         if (loader) {{
             loader.style.opacity = '0';
@@ -943,7 +965,7 @@ def main():
                 loader.style.display = 'none';
             }}, 500);
         }}
-    }});
+    }}, 1000);
 
     // Prevenir recarga accidental
     window.addEventListener('beforeunload', function(e) {{
