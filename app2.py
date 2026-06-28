@@ -337,10 +337,10 @@ def main():
         width: 100%;
         height: 100%;
         overflow: auto;
-        -webkit-overflow-scrolling: touch; /* Activa el scroll suave en iOS y Android */
+        -webkit-overflow-scrolling: touch;
         padding: 20px;
-        display: flex;         /* Agrega esto */
-        flex-direction: column; /* Esto pone el esqueleto y el botón uno debajo del otro */
+        display: flex;
+        flex-direction: column;
         align-items: center;
     }}
     
@@ -432,15 +432,14 @@ def main():
 
     #layout-principal {{
         display: flex;
-        justify-content: flex-start; /* <-- EL CAMBIO CLAVE: Alinea a la izquierda en vez del centro */
+        justify-content: flex-start;
         gap: 40px;
-        width: fit-content; /* <-- Ayuda a que el contenedor respete el ancho de los hijos */
-        min-width: 1400px; 
+        width: fit-content;
+        min-width: 1400px;
         position: relative;
-        padding-left: 20px; /* Un pequeño margen para que las banderas no se peguen al borde de la pantalla */
+        padding-left: 20px;
         padding-right: 20px;
         margin: 0 auto;
-        
         zoom: 0.7;
     }}
 
@@ -778,11 +777,13 @@ def main():
     }}
 
     #boton-enviar {{
-        display: block; margin: 20px auto; padding: 10px 20px;
-        zoom: 0.7;
+        display: block;
+        margin: 40px auto; /* El 'auto' aquí es el que centra el botón horizontalmente */
+        zoom: 0.7;        /* Igualamos el zoom para que no se vea gigante */
         width: 200px;
-        background-color: #4CAF50; color: white; border: none;
-        border-radius: 5px; cursor: pointer; font-size: 16px;
+        text-align: center;
+        /* Asegúrate de que no tenga posiciones absolutas que lo saquen del flujo */
+        position: relative;
     }}
     #boton-enviar:hover {{ background-color: #45a049; }}
     #mensaje-terminal {{ color: white; text-align: center; margin-top: 30px;}}
