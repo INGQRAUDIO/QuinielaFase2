@@ -437,6 +437,8 @@ def main():
         padding-left: 20px; /* Un pequeño margen para que las banderas no se peguen al borde de la pantalla */
         padding-right: 20px;
         margin: 0 auto;
+        
+        zoomzoom: 0.7;
     }}
 
     .lado-izquierdo, .lado-derecho {{
