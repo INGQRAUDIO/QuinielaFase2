@@ -96,19 +96,19 @@ def main():
         "B5": "br.svg", "B1": "jp.svg",
         "B6": "ci.svg", "B2": "no.svg",
         "B7": "mx.svg", "B3": "ec.svg",
-        "B8": "gb-eng.svg", "B4": "",
+        "B8": "gb-eng.svg", "B4": "cd.svg",
         
         # Grupo C
-        "C1": "hr.svg", "C5": "",
+        "C1": "hr.svg", "C5": "pt.svg",
         "C2": "es.svg", "C6": "",
         "C3": "us.svg", "C7": "ba.svg",
-        "C4": "be.svg", "C8": "",
+        "C4": "be.svg", "C8": "sn.svg",
         
         # Grupo D
         "D1": "ar.svg", "D5": "cv.svg",
         "D2": "au.svg", "D6": "ir.svg",
         "D3": "ch.svg", "D7": "",
-        "D4": "gh.svg", "D8": ""
+        "D4": "gh.svg", "D8": "co.svg"
     }
 
     HERENCIA_CONEXIONES = {
@@ -953,6 +953,7 @@ def main():
         "py.svg": "Paraguay", "sn.svg": "Senegal", "pl.svg": "Polonia",
         "za.svg": "Sudáfrica", "dk.svg": "Dinamarca", "tn.svg": "Túnez",
         "ba.svg": "Bosnia y Herzegovina",
+        "sn.svg": "Senegal",
         "co.svg": "Colombia", "hr.svg": "Croacia"
     }};
 
