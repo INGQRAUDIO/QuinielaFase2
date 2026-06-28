@@ -244,6 +244,7 @@ def main():
     <!DOCTYPE html>
     <html>
     <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
     <style>
     
     /* Estilos del Loader */
@@ -323,7 +324,7 @@ def main():
         font-family: 'Roboto', sans-serif;
     }}
     
-    html, body {{ width: 100%; min-height: 100vh; background-color: #0E1117; }}
+    html, body {{ width: 100%; min-height: 100vh; background-color: #0E1117; overflow: auto;}}
     body {{ padding: 20px; }}
 
     /* PANTALLA DE BIENVENIDA */
@@ -416,6 +417,7 @@ def main():
         justify-content: center;
         gap: 40px;
         width: 100%;
+        min-width: 1400px;
         min-height: calc(100vh - 120px);
         position: relative;
     }}
@@ -1259,7 +1261,7 @@ def main():
     </html>
     """
 
-    st.components.v1.html(html_completo, height=900)
+    st.components.v1.html(html_completo, height=900, scrolling=True)
 
 if __name__ == "__main__":
     main()
