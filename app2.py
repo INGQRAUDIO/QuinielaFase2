@@ -429,12 +429,14 @@ def main():
 
     #layout-principal {{
         display: flex;
-        justify-content: center;
+        justify-content: flex-start; /* <-- EL CAMBIO CLAVE: Alinea a la izquierda en vez del centro */
         gap: 40px;
-        width: 100%;
-        min-width: 1400px;
-        min-height: calc(100vh - 120px);
+        width: fit-content; /* <-- Ayuda a que el contenedor respete el ancho de los hijos */
+        min-width: 1400px; 
         position: relative;
+        padding-left: 20px; /* Un pequeño margen para que las banderas no se peguen al borde de la pantalla */
+        padding-right: 20px;
+        margin: 0 auto;
     }}
 
     .lado-izquierdo, .lado-derecho {{
