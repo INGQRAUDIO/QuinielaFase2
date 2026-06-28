@@ -85,6 +85,22 @@ def main():
     claves_w1 = ["W1"]
     claves_s2 = ["S2"]
 
+    # Lista completa de todas las claves (para validación de banderas)
+    todas_claves = list(set(
+        claves_izquierda_1 + claves_izquierda_2 + claves_izquierda_3 +
+        claves_izquierda_4 + claves_izquierda_5 + claves_izquierda_6 +
+        claves_derecha_1 + claves_derecha_2 + claves_derecha_3 +
+        claves_derecha_4 + claves_derecha_5 + claves_derecha_6 +
+        claves_a13 + claves_a14 + claves_a15 +
+        claves_b13 + claves_b14 + claves_b15 +
+        claves_c13 + claves_c14 + claves_c15 +
+        claves_d13 + claves_d14 + claves_d15 +
+        claves_s1 + claves_w1 + claves_s2
+    ))
+
+    # Claves que SÍ requieren goles (excluye W1)
+    todas_claves_con_goles = [c for c in todas_claves if c != "W1"]
+
     herencia_fija = {
         # Grupo A
         "A1": "de.svg", "A5": "py.svg",
@@ -148,7 +164,7 @@ def main():
     claves_con_linea_abajo = {"A9","A11","B9","B11","C9","C11","D9","D11"}
     claves_con_linea_arriba = {"A10","A12","B10","B12","C10","C12","D10","D12"}
 
-    def generar_html_rectangulos(claves, prefijo, clase_menu="", restricciones=None):
+    def generar_html_rectangulos(claves, prefijo, clase_menu="", restricciones=None, mostrar_goles=True):
         html = ""
         for i, clave in enumerate(claves):
             bandera_fija = herencia_fija.get(clave, None)
@@ -183,6 +199,11 @@ def main():
             if clave in claves_con_linea_arriba:
                 lineas_html += '<div class="linea-vertical linea-arriba"></div>'
 
+            # Input de goles (solo si mostrar_goles=True)
+            input_goles_html = ""
+            if mostrar_goles:
+                input_goles_html = f'<input type="number" class="input-goles" id="goles-{clave}" data-key="{clave}" min="0" placeholder="-" style="display: none;" oninput="guardarGoles(this)">'
+
             html += f"""
             <div class="rectangulo-container">
                 {lineas_html}
@@ -191,7 +212,7 @@ def main():
                     <span class="clave-texto">{clave}</span>
                 </div>
                 
-                <input type="number" class="input-goles" id="goles-{clave}" data-key="{clave}" min="0" placeholder="-" style="display: none;" oninput="guardarGoles(this)">
+                {input_goles_html}
                 
                 <div class="menu-banderas {clase_menu}" id="menu-{prefijo}-{i}">
                     {banderas_menu}
@@ -218,7 +239,8 @@ def main():
     html_d15 = generar_html_rectangulos(claves_d15, "d15", "menu-derecha", restricciones=restricciones_banderas)
 
     html_s1 = generar_html_rectangulos(claves_s1, "s1", restricciones=restricciones_banderas)
-    html_w1 = generar_html_rectangulos(claves_w1, "w1", restricciones=restricciones_banderas)
+    # --- W1 sin campo de goles ---
+    html_w1 = generar_html_rectangulos(claves_w1, "w1", restricciones=restricciones_banderas, mostrar_goles=False)
     html_s2 = generar_html_rectangulos(claves_s2, "s2", "menu-derecha", restricciones=restricciones_banderas)
 
     html_derecha_1 = generar_html_rectangulos(claves_derecha_1, "der1", "menu-derecha", restricciones=restricciones_banderas)
@@ -239,6 +261,8 @@ def main():
     for nombre, b64 in banderas_base64_dict.items():
         banderas_disponibles_js.append({"nombre": nombre, "src": f"data:image/svg+xml;base64,{b64}"})
     banderas_disponibles_js = json.dumps(banderas_disponibles_js)
+    todas_claves_js = json.dumps(todas_claves)
+    todas_claves_con_goles_js = json.dumps(todas_claves_con_goles)
 
     html_completo = f"""
     <!DOCTYPE html>
@@ -310,6 +334,13 @@ def main():
         max-width: 400px;
         font-weight: bold;
         font-size: 18px;
+    }}
+
+    /* --- Estilo para resaltar campos faltantes --- */
+    .rectangulo-container.falta-campo {{
+        outline: 3px solid #ff3333;
+        outline-offset: 2px;
+        border-radius: 15px;
     }}
     
     /* 1. IMPORTAR LA FUENTE ROBOTO DESDE GOOGLE FONTS */
@@ -935,6 +966,8 @@ def main():
     var HERENCIA_FIJA = {herencia_fija_js};
     var HERENCIA_CONEXIONES = {herencia_conexiones_js};
     var BANDERAS_DISPONIBLES = {banderas_disponibles_js};
+    var TODAS_LAS_CLAVES = {todas_claves_js};
+    var TODAS_LAS_CLAVES_GOLES = {todas_claves_con_goles_js};
     var datosGoles = {{}};
     var nombreParticipante = "";
     var datosEnviados = false;
@@ -1115,16 +1148,21 @@ def main():
         var nombreBandera = imgElement.getAttribute('data-nombre');
         datosRectangulos[clave] = nombreBandera;
         
+        // Solo muestra input de goles si la clave lo tiene (W1 no tiene)
         var inputGoles = container.querySelector('.input-goles');
         if (inputGoles) {{
             inputGoles.style.display = 'block';
             inputGoles.value = '';
             datosGoles[clave] = '';
         }}
+        
+        // Si se selecciona bandera, quitamos la marca de falta si la tenía
+        container.classList.remove('falta-campo');
+        
         console.log("Bandera actualizada | Clave: " + clave + " | Bandera: " + nombreBandera);
     }}
     
-        function obtenerISO8601CDMX() {{
+    function obtenerISO8601CDMX() {{
         var d = new Date();
         var y = d.getUTCFullYear();
         var m = d.getUTCMonth();      // 0-11
@@ -1158,18 +1196,110 @@ def main():
                pad(h) + ':' + pad(min) + ':' + pad(s) + '.' + padMs(ms);
     }}
     
+    // --- FUNCIONES PARA MARCAR / DESMARCAR CAMPOS FALTANTES ---
+    function marcarCamposFaltantes() {{
+        limpiarMarcas();  // Primero quitamos todas las marcas
+        
+        // Revisar banderas en TODAS las claves
+        for (var i = 0; i < TODAS_LAS_CLAVES.length; i++) {{
+            var clave = TODAS_LAS_CLAVES[i];
+            if (!(clave in datosRectangulos)) {{
+                var container = document.querySelector('.rectangulo-pulse[data-key="' + clave + '"]');
+                if (container) {{
+                    container = container.closest('.rectangulo-container');
+                    if (container) container.classList.add('falta-campo');
+                }}
+            }}
+        }}
+        
+        // Revisar goles SOLO en claves que lo requieren (excluye W1)
+        for (var j = 0; j < TODAS_LAS_CLAVES_GOLES.length; j++) {{
+            var claveG = TODAS_LAS_CLAVES_GOLES[j];
+            var faltaGoles = !(claveG in datosGoles) || datosGoles[claveG] === "" || datosGoles[claveG] === undefined;
+            if (faltaGoles) {{
+                var containerG = document.querySelector('.rectangulo-pulse[data-key="' + claveG + '"]');
+                if (containerG) {{
+                    containerG = containerG.closest('.rectangulo-container');
+                    if (containerG) containerG.classList.add('falta-campo');
+                }}
+            }}
+        }}
+    }}
+    
+    function limpiarMarcas() {{
+        var marcados = document.querySelectorAll('.rectangulo-container.falta-campo');
+        for (var j = 0; j < marcados.length; j++) {{
+            marcados[j].classList.remove('falta-campo');
+        }}
+    }}
+    
+    // Modificamos guardarGoles para quitar la marca al escribir
+    function guardarGoles(inputElement) {{
+        if (datosEnviados) {{
+            inputElement.value = datosGoles[inputElement.getAttribute('data-key')] || '';
+            return;
+        }}
+        
+        var clave = inputElement.getAttribute('data-key');
+        var goles = inputElement.value;
+        datosGoles[clave] = goles;
+        
+        // Si ahora el campo tiene valor, quitar marca roja
+        var container = inputElement.closest('.rectangulo-container');
+        if (container) {{
+            container.classList.remove('falta-campo');
+        }}
+        
+        console.log("Goles actualizados | Clave: " + clave + " | Goles: " + goles);
+    }}
 
     async function enviarDatos() {{
-        // Verificar si ya se enviaron los datos
         if (datosEnviados) {{
             alert("Los datos ya fueron enviados. No es posible enviarlos nuevamente.");
+            return;
+        }}
+        
+        // Limpiar marcas previas antes de validar
+        limpiarMarcas();
+        
+        var faltanBanderas = [];
+        var faltanGoles = [];
+        
+        // Validar banderas en TODAS las claves
+        for (var i = 0; i < TODAS_LAS_CLAVES.length; i++) {{
+            var clave = TODAS_LAS_CLAVES[i];
+            if (!(clave in datosRectangulos)) {{
+                faltanBanderas.push(clave);
+            }}
+        }}
+        
+        // Validar goles solo en claves que lo requieren
+        for (var j = 0; j < TODAS_LAS_CLAVES_GOLES.length; j++) {{
+            var claveG = TODAS_LAS_CLAVES_GOLES[j];
+            if (!(claveG in datosGoles) || datosGoles[claveG] === "" || datosGoles[claveG] === undefined) {{
+                faltanGoles.push(claveG);
+            }}
+        }}
+        
+        if (faltanBanderas.length > 0 || faltanGoles.length > 0) {{
+            // Marcar visualmente los campos faltantes
+            marcarCamposFaltantes();
+            
+            var mensaje = "⚠️ No se puede enviar.";
+            if (faltanBanderas.length > 0 && faltanGoles.length > 0) {{
+                mensaje += "\\n\\nFaltan banderas por seleccionar y goles por ingresar.";
+            }} else if (faltanBanderas.length > 0) {{
+                mensaje += "\\n\\nFaltan banderas por seleccionar.";
+            }} else if (faltanGoles.length > 0) {{
+                mensaje += "\\n\\nFaltan goles por ingresar.";
+            }}
+            alert(mensaje);
             return;
         }}
         
         var boton = document.getElementById('boton-enviar');
         var mensajeExito = document.getElementById('mensaje-exito');
         
-        // Deshabilitar el botón inmediatamente
         boton.disabled = true;
         boton.classList.add('cargando');
         boton.textContent = 'Enviando...';
@@ -1208,77 +1338,47 @@ def main():
             }});
 
             if (response.ok) {{
-                // Marcar como enviado
                 datosEnviados = true;
-                
-                // Ocultar el botón
                 boton.style.display = 'none';
-                
-                // Mostrar mensaje de éxito
                 mensajeExito.style.display = 'block';
-                
                 document.getElementById('mensaje-terminal').textContent = 
                     "Registros guardados para " + nombreParticipante;
-                    
-                // Deshabilitar la interacción con los rectángulos
                 deshabilitarInteraccion();
-                
                 console.log("Datos enviados exitosamente");
             }} else {{
-                // Si hay error, rehabilitar el botón
                 boton.disabled = false;
                 boton.classList.remove('cargando');
                 boton.textContent = 'LISTO';
-                
                 var error = await response.text();
                 console.error("Error Supabase:", error);
                 alert("Error al guardar los datos. Revisa conexión o intenta nuevamente.");
             }}
         }} catch (err) {{
-            // Si hay error de red, rehabilitar el botón
             boton.disabled = false;
             boton.classList.remove('cargando');
             boton.textContent = 'LISTO';
-            
             console.error("Error de red:", err);
             alert("No se pudo conectar a la base de datos.");
         }}
     }}
     
-    // Función para deshabilitar la interacción después del envío
     function deshabilitarInteraccion() {{
-        // Deshabilitar todos los rectángulos
         var rectangulos = document.querySelectorAll('.rectangulo-pulse');
         rectangulos.forEach(function(rect) {{
             rect.style.pointerEvents = 'none';
             rect.style.opacity = '0.7';
         }});
         
-        // Deshabilitar todos los inputs de goles
         var inputs = document.querySelectorAll('.input-goles');
         inputs.forEach(function(input) {{
             input.disabled = true;
             input.style.opacity = '0.7';
         }});
         
-        // Ocultar todos los menús de banderas
         var menus = document.querySelectorAll('.menu-banderas');
         menus.forEach(function(menu) {{
             menu.style.display = 'none';
         }});
-    }}
-    
-    function guardarGoles(inputElement) {{
-        // No permitir modificar goles si ya se enviaron los datos
-        if (datosEnviados) {{
-            inputElement.value = datosGoles[inputElement.getAttribute('data-key')] || '';
-            return;
-        }}
-        
-        var clave = inputElement.getAttribute('data-key');
-        var goles = inputElement.value;
-        datosGoles[clave] = goles;
-        console.log("Goles actualizados | Clave: " + clave + " | Goles: " + goles);
     }}
 
     document.addEventListener('click', function(event) {{
