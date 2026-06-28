@@ -567,7 +567,7 @@ def main():
         top: 50%;
         left: 50%;
         transform: translate(-50%, -50%);
-        color: #00be3b;
+        color: white;
         font-size: 20px;
         font-weight: bold;
         background-color: #0E1117;
