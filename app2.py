@@ -106,7 +106,7 @@ def main():
         
         # Grupo D
         "D1": "ar.svg", "D5": "cv.svg",
-        "D2": "au.svg", "D6": "ir.svg",
+        "D2": "au.svg", "D6": "eg.svg",
         "D3": "ch.svg", "D7": "",
         "D4": "gh.svg", "D8": "co.svg"
     }
