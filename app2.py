@@ -3,7 +3,11 @@ import os
 import base64
 import json
 
-st.set_page_config(layout="wide")
+st.set_page_config(
+    layout="wide",
+    page_title="Quiniela 90.9 // FASE 2",
+    page_icon="Iconos/copa-mundial.ico"   
+)
 
 st.markdown(
     """
@@ -51,6 +55,16 @@ def main():
             svg_base64 = base64.b64encode(svg_content).decode('utf-8')
             banderas_base64_dict[bandera] = svg_base64
             banderas_html += f'<img src="data:image/svg+xml;base64,{svg_base64}" data-nombre="{bandera}" onclick="seleccionarBandera(this, \'data:image/svg+xml;base64,{svg_base64}\')">'
+
+    
+
+    # Cargar el icono de la copa
+    icono_path = os.path.join("Iconos", "IBERO-909-COPA.ico")
+    try:
+        with open(icono_path, "rb") as f:
+            icono_base64 = base64.b64encode(f.read()).decode('utf-8')
+    except FileNotFoundError:
+        icono_base64 = ""  # No se mostrará imagen si el archivo no existe
 
     # Listas de claves (sin cambios)
     claves_izquierda_1 = ["A1", "A2", "A3", "A4"]
@@ -343,6 +357,23 @@ def main():
         border-radius: 15px;
     }}
     
+    /* --- NUEVO: Tooltip para mostrar el nombre del país al pasar el mouse --- */
+    #tooltip-pais {{
+        position: fixed;
+        background-color: rgba(30,30,30,0.95);
+        color: white;
+        padding: 6px 12px;
+        border-radius: 6px;
+        font-size: 14px;
+        font-weight: bold;
+        font-family: 'Roboto', sans-serif;
+        pointer-events: none;
+        z-index: 10000;
+        display: none;
+        white-space: nowrap;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+    }}
+    
     /* 1. IMPORTAR LA FUENTE ROBOTO DESDE GOOGLE FONTS */
     @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap');
 
@@ -487,7 +518,7 @@ def main():
         display: flex; flex-direction: column; align-items: center;
         justify-content: center; align-self: center;
     }}
-    .columna-w1 {{ transform: translateY(-200px); }}
+    .columna-w1 {{ transform: translateY(-200px); position: relative;}}
     .columna-s1 {{ transform: translateX(-50px); }}
     .columna-s2 {{ transform: translateX(50px); }}
 
@@ -607,6 +638,18 @@ def main():
         z-index: 2;
         pointer-events: none;
         line-height: 1;
+    }}
+    
+    /* Icono de la copa arriba de W1 */
+    #icono-copa {{
+        position: absolute;
+        top: -135px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 150px;
+        height: auto;
+        z-index: 5;
+        pointer-events: none;
     }}
 
     /* Conectores horizontales (SVG) */
@@ -901,7 +944,7 @@ def main():
             <div class="conector-w1-vertical"></div>
 
             <div class="columna-s1"> {html_s1} </div>
-            <div class="columna-w1"> {html_w1} </div>
+            <div class="columna-w1"><img src="data:image/x-icon;base64,{icono_base64}" id="icono-copa" alt="Copa Ibero">{html_w1}</div>
             <div class="columna-s2"> {html_s2} </div>
 
             <div class="lado-derecho">
@@ -961,6 +1004,10 @@ def main():
         <div id="mensaje-terminal"></div>
 
     </div>
+
+    <!-- NUEVO: Tooltip para nombres de países -->
+    <div id="tooltip-pais"></div>
+
     <script>
     var datosRectangulos = {{}};
     var HERENCIA_FIJA = {herencia_fija_js};
@@ -995,6 +1042,44 @@ def main():
         datosRectangulos[clave] = HERENCIA_FIJA[clave];
     }}
     
+    // Tooltip
+    function mostrarTooltipPais(event) {{
+        var rect = event.currentTarget;
+        var clave = rect.getAttribute('data-key');
+        if (clave && datosRectangulos[clave]) {{
+            var nombreArchivo = datosRectangulos[clave];
+            var nombrePais = NOMBRES_PAISES[nombreArchivo] || nombreArchivo;
+            var tooltip = document.getElementById('tooltip-pais');
+            tooltip.textContent = nombrePais;
+            tooltip.style.display = 'block';
+            tooltip.style.left = (event.clientX + 15) + 'px';
+            tooltip.style.top = (event.clientY + 15) + 'px';
+        }}
+    }}
+
+    function ocultarTooltipPais() {{
+        var tooltip = document.getElementById('tooltip-pais');
+        tooltip.style.display = 'none';
+    }}
+
+    function moverTooltipPais(event) {{
+        var tooltip = document.getElementById('tooltip-pais');
+        if (tooltip.style.display === 'block') {{
+            tooltip.style.left = (event.clientX + 15) + 'px';
+            tooltip.style.top = (event.clientY + 15) + 'px';
+        }}
+    }}
+
+    // Asignar eventos a todos los rectángulos cuando la página cargue
+    window.addEventListener('load', function() {{
+        var rectangulos = document.querySelectorAll('.rectangulo-pulse');
+        rectangulos.forEach(function(rect) {{
+            rect.addEventListener('mouseenter', mostrarTooltipPais);
+            rect.addEventListener('mouseleave', ocultarTooltipPais);
+            rect.addEventListener('mousemove', moverTooltipPais);
+        }});
+    }});
+
     // Lógica para ocultar el loader cuando la página cargue totalmente
     setTimeout(function() {{
         var loader = document.getElementById('loader-container');
