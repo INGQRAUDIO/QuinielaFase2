@@ -167,7 +167,7 @@ def main():
             elif clave in HERENCIA_CONEXIONES:
                 banderas_menu = ""
             else:
-                banderas_menu = banderas_html
+                banderas_menu = ""
 
             lineas_html = ""
             if clave in claves_con_linea_derecha:
@@ -335,7 +335,7 @@ def main():
     
     #contenedor-master {{
         width: 100%;
-        height: 100vh;
+        height: 100%;
         overflow: auto;
         -webkit-overflow-scrolling: touch; /* Activa el scroll suave en iOS y Android */
         padding: 20px;
@@ -1030,10 +1030,7 @@ def main():
     }})();
 
     function mostrarMenu(event, rectanguloId) {{
-        // No permitir interacción si ya se enviaron los datos
-        if (datosEnviados) {{
-            return;
-        }}
+        if (datosEnviados) return;
         
         var menu = document.getElementById('menu-' + rectanguloId);
         if (!menu) return;
@@ -1041,10 +1038,14 @@ def main():
         var rectangulo = container.querySelector('.rectangulo-pulse');
         var clave = rectangulo.getAttribute('data-key');
         var bloqueado = rectangulo.getAttribute('data-bloqueado');
+        
         if (bloqueado === 'true' || HERENCIA_FIJA.hasOwnProperty(clave)) {{
-            console.log("Elemento " + clave + " bloqueado por herencia.");
             return;
         }}
+
+        // Lógica optimizada: Solo dibujamos las banderas necesarias
+        var banderasParaMostrar = [];
+        
         if (HERENCIA_CONEXIONES.hasOwnProperty(clave)) {{
             var padres = HERENCIA_CONEXIONES[clave];
             var banderasPermitidas = [];
@@ -1054,18 +1055,26 @@ def main():
                     banderasPermitidas.push(banderaPadre);
                 }}
             }}
-            menu.innerHTML = '';
             for (var b = 0; b < BANDERAS_DISPONIBLES.length; b++) {{
-                var bandera = BANDERAS_DISPONIBLES[b];
-                if (banderasPermitidas.indexOf(bandera.nombre) !== -1) {{
-                    var img = document.createElement('img');
-                    img.src = bandera.src;
-                    img.setAttribute('data-nombre', bandera.nombre);
-                    img.onclick = function() {{ seleccionarBandera(this, this.src); }};
-                    menu.appendChild(img);
+                if (banderasPermitidas.indexOf(BANDERAS_DISPONIBLES[b].nombre) !== -1) {{
+                    banderasParaMostrar.push(BANDERAS_DISPONIBLES[b]);
                 }}
             }}
+        }} else {{
+            banderasParaMostrar = BANDERAS_DISPONIBLES; // Nodos iniciales libres
         }}
+
+        // Construir el menú dinámicamente SOLO si está vacío
+        if (menu.innerHTML.trim() === '') {{
+            for (var i = 0; i < banderasParaMostrar.length; i++) {{
+                var img = document.createElement('img');
+                img.src = banderasParaMostrar[i].src;
+                img.setAttribute('data-nombre', banderasParaMostrar[i].nombre);
+                img.onclick = function() {{ seleccionarBandera(this, this.src); }};
+                menu.appendChild(img);
+            }}
+        }}
+
         event.stopPropagation();
         var menus = document.getElementsByClassName('menu-banderas');
         for (var i = 0; i < menus.length; i++) {{
