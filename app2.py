@@ -894,7 +894,7 @@ def main():
     <div id="pantalla-cerrada">
         <div class="contenedor-cerrado">
             <h2>ESTA QUINIELA SE HA CERRADO</h2>
-            <p>Los resultados aparecerán en esta misma página a partir del día lunes 29 De Junio del 2026 al término del día.</p>
+            <p>Los resultados aparecerán en esta misma página a partir del día Lunes 29 de Junio al término del día.</p>
         </div>
     </div>
     
@@ -1446,8 +1446,8 @@ def main():
         console.log("Enviando a Supabase...");
         console.log(JSON.stringify(filas, null, 2));
 
-        var SUPABASE_URL = "https://ubnxgjhvyqvqrmybalkg.supabase.co";
-        var SUPABASE_ANON_KEY = "sb_publishable_ffGHwrBMZojB9_ZEY32YEw_Y2SPVz9C";
+        var SUPABASE_URL = "{st.secrets['SUPABASE_URL']}";
+        var SUPABASE_ANON_KEY = "{st.secrets['SUPABASE_KEY']}";
 
         try {{
             var response = await fetch(SUPABASE_URL + "/rest/v1/Quiniela_Fase2", {{
