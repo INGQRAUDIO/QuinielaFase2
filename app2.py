@@ -808,7 +808,7 @@ def main():
                     <li><strong></strong> Una vez elegida la bandera, ingresa los goles del equipo en el recuadro que aparecerá debajo.</li>
                     <li><strong></strong> Continúa este proceso hasta llegar al recuadro central del Campeón.</li>
                     <li><strong></strong> Importante: Sigue las llaves correctamente.</li>
-                    <li><strong></strong> Al finalizar, haz clic en el botón verde "LISTO!!".</li>
+                    <li><strong></strong> Al finalizar, haz clic en el botón verde "LISTO".</li>
                 </ul>
                 <button onclick="iniciarApp()" style="width: 100%;">COMENZAR</button>
             </div>
@@ -925,7 +925,7 @@ def main():
             </div>
         </div>
 
-        <button id="boton-enviar" onclick="enviarDatos()">LISTO!!</button>
+        <button id="boton-enviar" onclick="enviarDatos()">LISTO</button>
         <div class="mensaje-exito" id="mensaje-exito">¡Datos enviados correctamente!</div>
         <div id="mensaje-terminal"></div>
 
@@ -1228,7 +1228,7 @@ def main():
                 // Si hay error, rehabilitar el botón
                 boton.disabled = false;
                 boton.classList.remove('cargando');
-                boton.textContent = 'LISTO!!';
+                boton.textContent = 'LISTO';
                 
                 var error = await response.text();
                 console.error("Error Supabase:", error);
@@ -1238,7 +1238,7 @@ def main():
             // Si hay error de red, rehabilitar el botón
             boton.disabled = false;
             boton.classList.remove('cargando');
-            boton.textContent = 'LISTO!!';
+            boton.textContent = 'LISTO';
             
             console.error("Error de red:", err);
             alert("No se pudo conectar a la base de datos.");
