@@ -438,7 +438,7 @@ def main():
         padding-right: 20px;
         margin: 0 auto;
         
-        zoom: 0.8;
+        zoom: 0.7;
     }}
 
     .lado-izquierdo, .lado-derecho {{
