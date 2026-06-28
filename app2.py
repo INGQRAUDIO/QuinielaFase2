@@ -100,14 +100,14 @@ def main():
         
         # Grupo C
         "C1": "hr.svg", "C5": "pt.svg",
-        "C2": "es.svg", "C6": "",
+        "C2": "es.svg", "C6": "at.svg",
         "C3": "us.svg", "C7": "ba.svg",
         "C4": "be.svg", "C8": "sn.svg",
         
         # Grupo D
         "D1": "ar.svg", "D5": "cv.svg",
         "D2": "au.svg", "D6": "eg.svg",
-        "D3": "ch.svg", "D7": "",
+        "D3": "ch.svg", "D7": "dz.svg",
         "D4": "gh.svg", "D8": "co.svg"
     }
 
@@ -954,6 +954,7 @@ def main():
         "za.svg": "Sudáfrica", "dk.svg": "Dinamarca", "tn.svg": "Túnez",
         "ba.svg": "Bosnia y Herzegovina",
         "sn.svg": "Senegal",
+        "dz.svg": "Argelia",
         "co.svg": "Colombia", "hr.svg": "Croacia"
     }};
 
