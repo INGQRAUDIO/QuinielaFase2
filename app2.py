@@ -339,6 +339,9 @@ def main():
         overflow: auto;
         -webkit-overflow-scrolling: touch; /* Activa el scroll suave en iOS y Android */
         padding: 20px;
+        display: flex;         /* Agrega esto */
+        flex-direction: column; /* Esto pone el esqueleto y el botón uno debajo del otro */
+        align-items: center;
     }}
     
 
@@ -776,6 +779,8 @@ def main():
 
     #boton-enviar {{
         display: block; margin: 20px auto; padding: 10px 20px;
+        zoom: 0.7;
+        width: 200px;
         background-color: #4CAF50; color: white; border: none;
         border-radius: 5px; cursor: pointer; font-size: 16px;
     }}
