@@ -895,6 +895,7 @@ def main():
         <div class="contenedor-cerrado">
             <h2>ESTA QUINIELA SE HA CERRADO</h2>
             <p>Los resultados aparecerán en esta misma página a partir del día Lunes 29 de Junio al término del día.</p>
+            <p>Todos los dias se publicarán los resultados</p>
         </div>
     </div>
     
