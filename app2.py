@@ -1301,6 +1301,7 @@ participants_html = f"""<!DOCTYPE html>
     display: flex;
     justify-content: center;
     padding: 30px 20px 50px 20px;
+    -webkit-overflow-scrolling: touch;
   }}
   .page-wrap {{
     position: relative;
