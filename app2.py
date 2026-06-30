@@ -810,6 +810,7 @@ def construir_tabla_detalle_html(titulo, subtitulo, tabla_bloque):
       }}
       .quiniela-table {{
         width: 100%;
+        min-width: 600px;
         border-collapse: collapse;
         background: rgba(20, 15, 5, 0.5);
         border: 1px solid #3a2e10;
@@ -901,6 +902,7 @@ def construir_tabla_detalle_html(titulo, subtitulo, tabla_bloque):
         <h2 class="title">{titulo}</h2>
         <div class="subtitle">{subtitulo}</div>
         <div class="divider"></div>
+        <div class="table-scroll">
         {tabla_bloque}
       </div>
     </body>
