@@ -1,1527 +1,1423 @@
 import streamlit as st
-import os
+import streamlit.components.v1 as components
+import math
 import base64
+import os
 import json
+import requests
+import urllib.parse
+from collections import defaultdict
 
-st.set_page_config(
-    layout="wide",
-    page_title="Quiniela 90.9 // FASE 2",
-    page_icon="Iconos/copa-mundial.ico"   
-)
 
-st.markdown(
-    """
-    <style>
-    .block-container, [data-testid="stAppViewBlockContainer"] {
-        padding-left: 0rem !important;
-        padding-right: 0rem !important;
-        padding-top: 0rem !important;
-        padding-bottom: 0rem !important;
-        max-width: 100% !important;
+# ─── Supabase ────────────────────────────────────────────────────────
+SUPABASE_URL = st.secrets["SUPABASE_URL"]
+SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
+
+@st.cache_data(ttl=0)
+def obtener_participantes():
+    headers = {
+        "apikey": SUPABASE_KEY,
+        "Authorization": f"Bearer {SUPABASE_KEY}"
     }
-    header {visibility: hidden;}
-    </style>
-    """,
-    unsafe_allow_html=True
-)
-
-@st.cache_data
-def cargar_banderas():
-    banderas_path = "Banderas"
-    banderas_base64_dict = {}
-    if os.path.exists(banderas_path):
-        banderas = [f for f in os.listdir(banderas_path) if f.endswith('.svg')]
-        for bandera in banderas:
-            ruta_bandera = os.path.join(banderas_path, bandera)
-            with open(ruta_bandera, "rb") as f:
-                svg_content = f.read()
-                banderas_base64_dict[bandera] = base64.b64encode(svg_content).decode('utf-8')
-    return banderas_base64_dict
-
+    all_names = []
+    limit = 1000
+    offset = 0
+    while True:
+        url = f"{SUPABASE_URL}/rest/v1/Quiniela_Fase2?select=nombre&limit={limit}&offset={offset}"
+        try:
+            resp = requests.get(url, headers=headers)
+            resp.raise_for_status()
+            batch = resp.json()
+            if not batch:
+                break
+            all_names.extend(row["nombre"] for row in batch if row.get("nombre"))
+            offset += limit
+        except Exception as e:
+            st.error(f"Error al conectar con Supabase: {e}")
+            return []
+    return list(dict.fromkeys(all_names))
 
 
-def main():
-    banderas_path = "Banderas"
-    banderas = []
-    if os.path.exists(banderas_path):
-        banderas = [f for f in os.listdir(banderas_path) if f.endswith('.svg')]
-
-    banderas_html = ""
-    banderas_base64_dict = {}
-    for bandera in banderas:
-        ruta_bandera = os.path.join(banderas_path, bandera)
-        with open(ruta_bandera, "rb") as f:
-            svg_content = f.read()
-            svg_base64 = base64.b64encode(svg_content).decode('utf-8')
-            banderas_base64_dict[bandera] = svg_base64
-            banderas_html += f'<img src="data:image/svg+xml;base64,{svg_base64}" data-nombre="{bandera}" onclick="seleccionarBandera(this, \'data:image/svg+xml;base64,{svg_base64}\')">'
-
-    
-
-    # Cargar el icono de la copa
-    icono_path = os.path.join("Iconos", "IBERO-909-COPA.ico")
-    try:
-        with open(icono_path, "rb") as f:
-            icono_base64 = base64.b64encode(f.read()).decode('utf-8')
-    except FileNotFoundError:
-        icono_base64 = ""  # No se mostrará imagen si el archivo no existe
-
-    # Listas de claves (sin cambios)
-    claves_izquierda_1 = ["A1", "A2", "A3", "A4"]
-    claves_izquierda_2 = ["A5", "A6", "A7", "A8"]
-    claves_izquierda_3 = ["A9", "A10", "A11", "A12"]
-    claves_izquierda_4 = ["C1", "C2", "C3", "C4"]
-    claves_izquierda_5 = ["C5", "C6", "C7", "C8"]
-    claves_izquierda_6 = ["C9", "C10", "C11", "C12"]
-
-    claves_derecha_1 = ["B1", "B2", "B3", "B4"]
-    claves_derecha_2 = ["B5", "B6", "B7", "B8"]
-    claves_derecha_3 = ["B9", "B10", "B11", "B12"]
-    claves_derecha_4 = ["D1", "D2", "D3", "D4"]
-    claves_derecha_5 = ["D5", "D6", "D7", "D8"]
-    claves_derecha_6 = ["D9", "D10", "D11", "D12"]
-
-    claves_a13 = ["A13"]
-    claves_a14 = ["A14"]
-    claves_a15 = ["A15"]
-    claves_b13 = ["B13"]
-    claves_b14 = ["B14"]
-    claves_c13 = ["C13"]
-    claves_c14 = ["C14"]
-    claves_d13 = ["D13"]
-    claves_d14 = ["D14"]
-
-    claves_b15 = ["B15"]
-    claves_c15 = ["C15"]
-    claves_d15 = ["D15"]
-
-    claves_s1 = ["S1"]
-    claves_w1 = ["W1"]
-    claves_s2 = ["S2"]
-
-    # Lista completa de todas las claves (para validación de banderas)
-    todas_claves = list(set(
-        claves_izquierda_1 + claves_izquierda_2 + claves_izquierda_3 +
-        claves_izquierda_4 + claves_izquierda_5 + claves_izquierda_6 +
-        claves_derecha_1 + claves_derecha_2 + claves_derecha_3 +
-        claves_derecha_4 + claves_derecha_5 + claves_derecha_6 +
-        claves_a13 + claves_a14 + claves_a15 +
-        claves_b13 + claves_b14 + claves_b15 +
-        claves_c13 + claves_c14 + claves_c15 +
-        claves_d13 + claves_d14 + claves_d15 +
-        claves_s1 + claves_w1 + claves_s2
-    ))
-
-    # Claves que SÍ requieren goles (excluye W1)
-    todas_claves_con_goles = [c for c in todas_claves if c != "W1"]
-
-    herencia_fija = {
-        # Grupo A
-        "A1": "de.svg", "A5": "py.svg",
-        "A2": "fr.svg", "A6": "se.svg",
-        "A3": "za.svg", "A7": "ca.svg",
-        "A4": "nl.svg", "A8": "ma.svg",
-        
-        # Grupo B
-        "B5": "br.svg", "B1": "jp.svg",
-        "B6": "ci.svg", "B2": "no.svg",
-        "B7": "mx.svg", "B3": "ec.svg",
-        "B8": "gb-eng.svg", "B4": "cd.svg",
-        
-        # Grupo C
-        "C1": "hr.svg", "C5": "pt.svg",
-        "C2": "es.svg", "C6": "at.svg",
-        "C3": "us.svg", "C7": "ba.svg",
-        "C4": "be.svg", "C8": "sn.svg",
-        
-        # Grupo D
-        "D1": "ar.svg", "D5": "cv.svg",
-        "D2": "au.svg", "D6": "eg.svg",
-        "D3": "ch.svg", "D7": "dz.svg",
-        "D4": "gh.svg", "D8": "co.svg"
+def obtener_datos_participante(nombre):
+    """Devuelve todas las filas de la tabla Quiniela_Fase2 para un nombre dado."""
+    headers = {
+        "apikey": SUPABASE_KEY,
+        "Authorization": f"Bearer {SUPABASE_KEY}"
     }
+    all_rows = []
+    limit = 1000
+    offset = 0
+    nombre_limpio = nombre.strip()
+    while True:
+        url = (
+            f"{SUPABASE_URL}/rest/v1/Quiniela_Fase2?"
+            f"select=*&nombre=ilike.{urllib.parse.quote(nombre_limpio)}"
+            f"&limit={limit}&offset={offset}"
+        )
+        try:
+            resp = requests.get(url, headers=headers)
+            resp.raise_for_status()
+            batch = resp.json()
+            if not batch:
+                break
+            all_rows.extend(batch)
+            offset += limit
+        except Exception as e:
+            st.error(f"Error al obtener datos del participante: {e}")
+            return []
+    return all_rows
 
-    HERENCIA_CONEXIONES = {
-        "A9": ["A1","A5"], "A10": ["A2","A6"],
-        "A11": ["A3","A7"], "A12": ["A4","A8"],
-        "A13": ["A9","A10"], "A14": ["A11","A12"],
-        "A15": ["A13","A14"],
-        "B9": ["B5","B1"], "B10": ["B6","B2"],
-        "B11": ["B7","B3"], "B12": ["B8","B4"],
-        "B13": ["B9","B10"], "B14": ["B11","B12"],
-        "B15": ["B13","B14"],
-        "C9": ["C5","C1"], "C10": ["C6","C2"],
-        "C11": ["C7","C3"], "C12": ["C8","C4"],
-        "C13": ["C9","C10"], "C14": ["C11","C12"],
-        "C15": ["C13","C14"],
-        "D9": ["D5","D1"], "D10": ["D6","D2"],
-        "D11": ["D7","D3"], "D12": ["D8","D4"],
-        "D13": ["D9","D10"], "D14": ["D11","D12"],
-        "D15": ["D13","D14"],
-        "S1": ["A15","C15"], "S2": ["B15","D15"],
-        "W1": ["S1","S2"]
+
+@st.cache_data(ttl=0)
+def obtener_todos_los_registros():
+    headers = {
+        "apikey": SUPABASE_KEY,
+        "Authorization": f"Bearer {SUPABASE_KEY}"
     }
+    all_rows = []
+    limit = 1000
+    offset = 0
+    while True:
+        url = f"{SUPABASE_URL}/rest/v1/Quiniela_Fase2?select=*&limit={limit}&offset={offset}"
+        try:
+            resp = requests.get(url, headers=headers)
+            resp.raise_for_status()
+            batch = resp.json()
+            if not batch:
+                break
+            all_rows.extend(batch)
+            offset += limit
+        except Exception as e:
+            st.error(f"Error al obtener todos los registros: {e}")
+            return []
+    return all_rows
 
-    restricciones_banderas = {}
-    for clave, padres in HERENCIA_CONEXIONES.items():
-        todos_padres_fijos = all(padre in herencia_fija for padre in padres)
-        if todos_padres_fijos:
-            banderas_permitidas = set()
-            for padre in padres:
-                banderas_permitidas.add(herencia_fija[padre])
-            restricciones_banderas[clave] = sorted(list(banderas_permitidas))
 
-    claves_con_linea_derecha = {"A1","A2","A3","A4","C1","C2","C3","C4","B5","B6","B7","B8","D5","D6","D7","D8"}
-    claves_con_linea_izquierda = {"A5","A6","A7","A8","C5","C6","C7","C8","B1","B2","B3","B4","D1","D2","D3","D4"}
-    claves_con_avance_derecha = {"A5","A6","A7","A8","C5","C6","C7","C8"}
-    claves_con_avance_izquierda = {"B5","B6","B7","B8","D5","D6","D7","D8"}
-    claves_con_linea_abajo = {"A9","A11","B9","B11","C9","C11","D9","D11"}
-    claves_con_linea_arriba = {"A10","A12","B10","B12","C10","C12","D10","D12"}
+def calcular_aciertos_por_participante(rows):
+    participantes_rows = defaultdict(list)
+    for row in rows:
+        nombre = row.get("nombre", "").strip()
+        if nombre:
+            participantes_rows[nombre].append(row)
 
-    def generar_html_rectangulos(claves, prefijo, clase_menu="", restricciones=None, mostrar_goles=True):
-        html = ""
-        for i, clave in enumerate(claves):
-            bandera_fija = herencia_fija.get(clave, None)
-            contenido_inicial = ""
-            if bandera_fija:
-                b64 = banderas_base64_dict.get(bandera_fija, "")
-                if b64:
-                    contenido_inicial = f'<img src="data:image/svg+xml;base64,{b64}" class="bandera-seleccionada bandera-fija">'
+    aciertos_dict = {}
+    claves_r16_set = set(r16_key_map.values())
+    claves_r32_set = set(mapeo_circulo_a_indice.values())
 
-            if restricciones and clave in restricciones:
-                banderas_menu = ""
-                for bandera in restricciones[clave]:
-                    if bandera in banderas_base64_dict:
-                        b64 = banderas_base64_dict[bandera]
-                        banderas_menu += f'<img src="data:image/svg+xml;base64,{b64}" data-nombre="{bandera}" onclick="seleccionarBandera(this, \'data:image/svg+xml;base64,{b64}\')">'
-            elif clave in HERENCIA_CONEXIONES:
-                banderas_menu = ""
+    for nombre, rows_participante in participantes_rows.items():
+        aciertos_octavos = 0
+        aciertos_goles = 0
+        for row in rows_participante:
+            celda = (row.get("celda") or "").strip()
+            if celda in claves_r16_set:
+                pais_hijo = row.get("pais", "").strip()
+                pais_madre = resultados_madre_por_celda.get(celda)
+                if pais_madre and pais_hijo == pais_madre:
+                    aciertos_octavos += 1
+            elif celda in claves_r32_set:
+                goles_hijo = row.get("goles")
+                if goles_hijo is None:
+                    goles_hijo = ""
+                else:
+                    goles_hijo = str(goles_hijo).strip()
+                goles_madre = goles_madre_por_celda.get(celda)
+                if goles_madre is not None and goles_madre != "":
+                    try:
+                        if int(goles_hijo) == int(goles_madre):
+                            aciertos_goles += 1
+                    except (ValueError, TypeError):
+                        pass
+        total = aciertos_octavos + aciertos_goles
+        aciertos_dict[nombre] = total
+    return aciertos_dict
+
+
+# ════════════════════════════════════════════════════════════════════
+#  CONFIGURACIÓN GEOMÉTRICA DEL BRACKET (compartida por madre e hijas)
+# ════════════════════════════════════════════════════════════════════
+SIZE = 900
+Y_OFFSET = 100
+SVG_HEIGHT = SIZE + Y_OFFSET + 80
+
+TEAM_R   = 420
+R16_R    = 330
+R8_R     = 255
+R4_R     = 190
+R2_R     = 135
+RF_OUT   =  88
+RF_IN    =  55
+RC       =  28
+
+TEAM_NODE_R = 20
+DOT_R       =  5
+
+NUM_TEAMS   = 32
+NUM_MATCHES = 16
+DEG_STEP    = 360 / NUM_TEAMS
+PAIR_STEP   = 360 / NUM_MATCHES
+PAIR_OFFSET = DEG_STEP / 2
+
+C = {
+    "gold":   "#c8a84b",
+    "gold2":  "#a07030",
+    "gold3":  "#7a5520",
+    "gold4":  "#5a3d10",
+    "gold5":  "#3a2508",
+    "conn":   "#4a3818",
+    "dot":    "#b8922a",
+    "glow":   "#d4a843",
+}
+
+mapeo_circulo_a_indice = {
+    0: "B5", 1: "B1", 2: "B6", 3: "B2",
+    4: "B7", 5: "B3", 6: "B8", 7: "B4",
+    8: "D1", 9: "D5", 10: "D2", 11: "D6",
+    12: "D3", 13: "D7", 14: "D4", 15: "D8",
+    16: "C8", 17: "C4", 18: "C7", 19: "C3",
+    20: "C6", 21: "C2", 22: "C5", 23: "C1",
+    24: "A8", 25: "A4", 26: "A7", 27: "A3",
+    28: "A6", 29: "A2", 30: "A5", 31: "A1"
+}
+
+r16_key_map = {
+    0:  "B9", 1:  "B10", 2:  "B11", 3:  "B12",
+    4:  "D9", 5:  "D10", 6:  "D11", 7:  "D12",
+    8:  "C12", 9:  "C11", 10: "C10", 11: "C9",
+    12: "A12", 13: "A11", 14: "A10", 15: "A9"
+}
+qf_key_map = {
+    0: "B13", 1: "B14", 2: "D13", 3: "D14",
+    4: "C14", 5: "C13", 6: "A14", 7: "A13"
+}
+sf_key_map = {0: "B15", 1: "D15", 2: "C15", 3: "A15"}
+final_key_map = {0: "S2", 1: "S1"}
+champion_key_map = {0: "W1"}
+
+# ── Resultados reales del torneo (RUEDA MADRE) ──────────────────────
+herencia_fija = {
+    # Grupo A
+    "A1": "de.svg", "A5": "py.svg",
+    "A2": "fr.svg", "A6": "se.svg",
+    "A3": "za.svg", "A7": "ca.svg",
+    "A4": "nl.svg", "A8": "ma.svg",
+    # Grupo B
+    "B5": "br.svg", "B1": "jp.svg",
+    "B6": "ci.svg", "B2": "no.svg",
+    "B7": "mx.svg", "B3": "ec.svg",
+    "B8": "gb-eng.svg", "B4": "cd.svg",
+    # Grupo C
+    "C1": "hr.svg", "C5": "pt.svg",
+    "C2": "es.svg", "C6": "at.svg",
+    "C3": "us.svg", "C7": "ba.svg",
+    "C4": "be.svg", "C8": "sn.svg",
+    # Grupo D
+    "D1": "ar.svg", "D5": "cv.svg",
+    "D2": "au.svg", "D6": "eg.svg",
+    "D3": "ch.svg", "D7": "dz.svg",
+    "D4": "gh.svg", "D8": "co.svg"
+}
+
+madre_r16_flags = {
+    "B9": ("br.svg", "Brasil"),
+    "A11": ("ca.svg", "Canadá"),
+    "A12": ("ma.svg", "Marruecos"),
+    "A9": ("py.svg", "Paraguay"),
+    "B10": ("no.svg", "Noruega")
+}
+madre_qf_flags = {}
+madre_sf_flags = {}
+madre_final_flags = {}
+madre_champion_flags = {}
+
+# ── Goles de la rueda madre ─────────────────────────────────────────
+goles_madre_r32 = {
+    "A3": 0, "A7": 1,
+    "B5": 2, "B1": 1,
+    "A1": 4, "A5": 5,
+    "A4": 3, "A8": 4,
+    "B6": 1, "B2": 2,
+}
+goles_madre_r16 = {}
+goles_madre_qf = {}
+goles_madre_sf = {}
+goles_madre_final = {}
+goles_madre_champion = {}
+
+def _construir_goles_madre():
+    goles = {}
+    for ronda_dict in (
+        goles_madre_r32, goles_madre_r16, goles_madre_qf,
+        goles_madre_sf, goles_madre_final, goles_madre_champion,
+    ):
+        for clave, valor in ronda_dict.items():
+            goles[clave] = valor
+    return goles
+
+goles_madre_por_celda = _construir_goles_madre()
+
+flag_to_country = {
+    "de": "Alemania", "py": "Paraguay",
+    "fr": "Francia", "se": "Suecia",
+    "za": "Sudáfrica", "ca": "Canadá",
+    "nl": "Países Bajos", "ma": "Marruecos",
+    "br": "Brasil", "jp": "Japón",
+    "ci": "Costa de Marfil", "no": "Noruega",
+    "mx": "México", "ec": "Ecuador",
+    "gb-eng": "Inglaterra", "cd": "RD Congo",
+    "hr": "Croacia", "pt": "Portugal",
+    "es": "España", "at": "Austria",
+    "us": "Estados Unidos", "ba": "Bosnia y Herzegovina",
+    "be": "Bélgica", "sn": "Senegal",
+    "ar": "Argentina", "cv": "Cabo Verde",
+    "au": "Australia", "eg": "Egipto",
+    "ch": "Suiza", "dz": "Argelia",
+    "gh": "Ghana", "co": "Colombia"
+}
+country_to_flag = {v: k for k, v in flag_to_country.items()}
+
+def _construir_resultados_madre():
+    resultados = {}
+    for celda, archivo in herencia_fija.items():
+        codigo = archivo.replace(".svg", "")
+        pais = flag_to_country.get(codigo)
+        if pais:
+            resultados[celda] = pais
+    for ronda_dict in (
+        madre_r16_flags, madre_qf_flags, madre_sf_flags,
+        madre_final_flags, madre_champion_flags,
+    ):
+        for clave, (archivo, pais) in ronda_dict.items():
+            resultados[clave] = pais
+    return resultados
+
+resultados_madre_por_celda = _construir_resultados_madre()
+
+
+def d2r(deg): return deg * math.pi / 180
+
+
+def construir_bracket_html(
+    team_flags, r16_flags, qf_flags, sf_flags, final_flags, champion_flags,
+    titulo="COPA DEL MUNDO 2026",
+    resultados_madre=None,
+    solo_madre=False,
+    goles_madre=None,
+):
+    CX = SIZE // 2
+    CY = (SIZE // 2) + Y_OFFSET
+
+    def pt(r, deg):
+        a = d2r(deg - 90)
+        return CX + r * math.cos(a), CY + r * math.sin(a)
+
+    bg_els, conn_els, node_els = [], [], []
+
+    def line(x1, y1, x2, y2, col="#7a6030", w=1.3):
+        conn_els.append(
+            f'<line x1="{x1:.2f}" y1="{y1:.2f}" x2="{x2:.2f}" y2="{y2:.2f}" '
+            f'stroke="{col}" stroke-width="{w}"/>'
+        )
+
+    def arc(r, a0, a1, col="#7a6030", w=1.3):
+        if abs(a1 - a0) < 0.01: return
+        lf = 1 if abs(a1 - a0) > 180 else 0
+        sw = 1 if (a1 - a0) > 0 else 0
+        x0, y0 = pt(r, a0)
+        x1, y1 = pt(r, a1)
+        conn_els.append(
+            f'<path d="M{x0:.2f},{y0:.2f} A{r},{r} 0 {lf},{sw} {x1:.2f},{y1:.2f}" '
+            f'fill="none" stroke="{col}" stroke-width="{w}"/>'
+        )
+
+    def circle_ring(x, y, r, fill="#111", stroke="#c8a84b", sw=2.0, cls="", data_attrs=""):
+        node_els.append(
+            f'<circle cx="{x:.2f}" cy="{y:.2f}" r="{r}" '
+            f'fill="{fill}" stroke="{stroke}" stroke-width="{sw}" class="{cls}" {data_attrs}/>'
+        )
+
+    def dot(x, y, r=DOT_R, fill="#b8972a"):
+        node_els.append(f'<circle cx="{x:.2f}" cy="{y:.2f}" r="{r}" fill="{fill}"/>')
+
+    goles_madre = goles_madre or {}
+
+    def gol_label(x, y, valor):
+        if valor is None or valor == "":
+            return
+        node_els.append(
+            f'<text x="{x:.2f}" y="{(y + 3):.2f}" text-anchor="middle" '
+            f'fill="#0a0a0a" font-size="9" font-family="monospace" font-weight="bold" '
+            f'paint-order="stroke" stroke="#f0d060" stroke-width="2.2" '
+            f'style="pointer-events:none;">{valor}</text>'
+        )
+
+    bg_els.append('''
+    <defs>
+      <filter id="grayscale_filter">
+        <feColorMatrix type="saturate" values="0"/>
+        <feComponentTransfer>
+          <feFuncR type="linear" slope="0.55" intercept="0.05"/>
+          <feFuncG type="linear" slope="0.55" intercept="0.05"/>
+          <feFuncB type="linear" slope="0.55" intercept="0.05"/>
+        </feComponentTransfer>
+      </filter>
+    </defs>
+    ''')
+
+    GLOBAL_ROT = DEG_STEP / 2
+    team_angles = [GLOBAL_ROT + k * DEG_STEP for k in range(NUM_TEAMS)]
+
+    country_names = []
+    flags_dict = {}
+    for idx, celda in mapeo_circulo_a_indice.items():
+        celda_visible = (not solo_madre) or (resultados_madre and celda in resultados_madre)
+        archivo = team_flags.get(celda) if celda_visible else None
+        flags_dict[idx] = f"Banderas/{archivo}" if archivo else None
+        codigo = archivo.replace(".svg", "") if archivo else None
+        country_names.append(flag_to_country.get(codigo, "Por definir"))
+
+    equipos_eliminados = set()
+
+    loaded_flags = []
+    diameter = TEAM_NODE_R * 2
+    for idx, path in flags_dict.items():
+        if path and os.path.exists(path):
+            with open(path, "rb") as f:
+                b64 = base64.b64encode(f.read()).decode("utf-8")
+                b64_data = f"data:image/svg+xml;base64,{b64}"
+                bg_els.append(f'''
+                <defs>
+                  <pattern id="flag_{idx}" width="1" height="1" viewBox="0 0 {diameter} {diameter}">
+                    <image href="{b64_data}" x="0" y="0" width="{diameter}" height="{diameter}" preserveAspectRatio="none"/>
+                  </pattern>
+                </defs>
+                ''')
+                loaded_flags.append(idx)
+
+    def cargar_ronda(key_map, flags_map, node_radius, prefix):
+        loaded, names = {}, {}
+        diam = node_radius * 2
+        for idx_nodo, clave in key_map.items():
+            if clave not in flags_map:
+                continue
+            if solo_madre and not (resultados_madre and clave in resultados_madre):
+                continue
+            archivo, nombre_pais = flags_map[clave]
+            ruta = f"Banderas/{archivo}"
+            if os.path.exists(ruta):
+                with open(ruta, "rb") as f:
+                    b64 = base64.b64encode(f.read()).decode("utf-8")
+                    b64_data = f"data:image/svg+xml;base64,{b64}"
+                    bg_els.append(f'''
+                    <defs>
+                      <pattern id="flag_{prefix}_{idx_nodo}" width="1" height="1" viewBox="0 0 {diam} {diam}">
+                        <image href="{b64_data}" x="0" y="0" width="{diam}" height="{diam}" preserveAspectRatio="none"/>
+                      </pattern>
+                    </defs>
+                    ''')
+                    loaded[idx_nodo] = True
+                    names[idx_nodo] = nombre_pais
+        return loaded, names
+
+    R16_NODE_R   = DOT_R + 14
+    QF_NODE_R    = DOT_R + 14
+    SF_NODE_R    = DOT_R + 16
+    FINAL_NODE_R = DOT_R + 19
+    CHAMP_NODE_R = RC
+
+    r16_loaded, r16_names   = cargar_ronda(r16_key_map, r16_flags, R16_NODE_R, "r16")
+    qf_loaded, qf_names     = cargar_ronda(qf_key_map, qf_flags, QF_NODE_R, "qf")
+    sf_loaded, sf_names     = cargar_ronda(sf_key_map, sf_flags, SF_NODE_R, "sf")
+    final_loaded, final_names = cargar_ronda(final_key_map, final_flags, FINAL_NODE_R, "final")
+    champion_loaded, champion_names = cargar_ronda(champion_key_map, champion_flags, CHAMP_NODE_R, "champion")
+
+    def calcular_aciertos(key_map_ronda, flags_ronda, es_team_flags=False):
+        resultado = {}
+        if not resultados_madre:
+            return resultado
+        for idx_nodo, clave in key_map_ronda.items():
+            if es_team_flags:
+                archivo_hijo = flags_ronda.get(clave)
+                pais_hijo = flag_to_country.get(
+                    archivo_hijo.replace(".svg", "")
+                ) if archivo_hijo else None
             else:
-                banderas_menu = ""
+                entrada = flags_ronda.get(clave)
+                pais_hijo = entrada[1] if entrada else None
 
-            lineas_html = ""
-            if clave in claves_con_linea_derecha:
-                lineas_html += '<div class="linea-conectora linea-derecha"></div>'
-            if clave in claves_con_linea_izquierda:
-                lineas_html += '<div class="linea-conectora linea-izquierda"></div>'
-            if clave in claves_con_avance_derecha:
-                lineas_html += '<div class="linea-conectora linea-avance-derecha"></div>'
-            if clave in claves_con_avance_izquierda:
-                lineas_html += '<div class="linea-conectora linea-avance-izquierda"></div>'
-            if clave in claves_con_linea_abajo:
-                lineas_html += '<div class="linea-vertical linea-abajo"></div>'
-            if clave in claves_con_linea_arriba:
-                lineas_html += '<div class="linea-vertical linea-arriba"></div>'
+            pais_madre = resultados_madre.get(clave)
+            if pais_hijo is None or pais_madre is None:
+                continue
+            if pais_hijo == pais_madre:
+                resultado[idx_nodo] = "#3ddc6e"
+            else:
+                resultado[idx_nodo] = "#e0473e"
+        return resultado
 
-            # Input de goles (solo si mostrar_goles=True)
-            input_goles_html = ""
-            if mostrar_goles:
-                input_goles_html = f'<input type="number" class="input-goles" id="goles-{clave}" data-key="{clave}" min="0" placeholder="-" style="display: none;" oninput="guardarGoles(this)">'
+    aciertos_r16_stroke  = calcular_aciertos(r16_key_map, r16_flags)
+    aciertos_qf_stroke   = calcular_aciertos(qf_key_map, qf_flags)
+    aciertos_sf_stroke   = calcular_aciertos(sf_key_map, sf_flags)
+    aciertos_final_stroke = calcular_aciertos(final_key_map, final_flags)
 
-            html += f"""
-            <div class="rectangulo-container">
-                {lineas_html}
-                <div class="rectangulo-pulse" data-key="{clave}" data-bloqueado="{str(bandera_fija is not None).lower()}" onclick="mostrarMenu(event, '{prefijo}-{i}')">
-                    {contenido_inicial}
-                    <span class="clave-texto">{clave}</span>
-                </div>
-                
-                {input_goles_html}
-                
-                <div class="menu-banderas {clase_menu}" id="menu-{prefijo}-{i}">
-                    {banderas_menu}
-                </div>
-            </div>
-            """
-        return html
+    anchors_r16, anchors_qf, anchors_sf = [], [], []
 
-    html_izquierda_1 = generar_html_rectangulos(claves_izquierda_1, "izq1", restricciones=restricciones_banderas)
-    html_izquierda_2 = generar_html_rectangulos(claves_izquierda_2, "izq2", restricciones=restricciones_banderas)
-    html_izquierda_3 = generar_html_rectangulos(claves_izquierda_3, "izq3", restricciones=restricciones_banderas)
-    html_izquierda_4 = generar_html_rectangulos(claves_izquierda_4, "izq4", restricciones=restricciones_banderas)
-    html_izquierda_5 = generar_html_rectangulos(claves_izquierda_5, "izq5", restricciones=restricciones_banderas)
-    html_izquierda_6 = generar_html_rectangulos(claves_izquierda_6, "izq6", restricciones=restricciones_banderas)
+    for i in range(NUM_MATCHES):
+        ang_a = team_angles[i * 2]
+        ang_b = team_angles[i * 2 + 1]
+        pair_ang = (ang_a + ang_b) / 2
 
-    html_a13 = generar_html_rectangulos(claves_a13, "a13", restricciones=restricciones_banderas)
-    html_a14 = generar_html_rectangulos(claves_a14, "a14", restricciones=restricciones_banderas)
-    html_a15 = generar_html_rectangulos(claves_a15, "a15", restricciones=restricciones_banderas)
-    html_c13 = generar_html_rectangulos(claves_c13, "c13", restricciones=restricciones_banderas)
-    html_c14 = generar_html_rectangulos(claves_c14, "c14", restricciones=restricciones_banderas)
+        xa, ya = pt(TEAM_R, ang_a)
+        xb, yb = pt(TEAM_R, ang_b)
+        xn, yn = pt(R16_R, pair_ang)
 
-    html_b15 = generar_html_rectangulos(claves_b15, "b15", "menu-derecha", restricciones=restricciones_banderas)
-    html_c15 = generar_html_rectangulos(claves_c15, "c15", restricciones=restricciones_banderas)
-    html_d15 = generar_html_rectangulos(claves_d15, "d15", "menu-derecha", restricciones=restricciones_banderas)
+        R_meet = R16_R + (TEAM_R - R16_R) * 0.38
+        xma, yma = pt(R_meet, ang_a)
+        xmb, ymb = pt(R_meet, ang_b)
+        xmc, ymc = pt(R_meet, pair_ang)
 
-    html_s1 = generar_html_rectangulos(claves_s1, "s1", restricciones=restricciones_banderas)
-    # --- W1 sin campo de goles ---
-    html_w1 = generar_html_rectangulos(claves_w1, "w1", restricciones=restricciones_banderas, mostrar_goles=False)
-    html_s2 = generar_html_rectangulos(claves_s2, "s2", "menu-derecha", restricciones=restricciones_banderas)
+        line(xa, ya, xma, yma, col=C["gold2"], w=1.3)
+        line(xb, yb, xmb, ymb, col=C["gold2"], w=1.3)
+        line(xma, yma, xmb, ymb, col=C["gold2"], w=1.3)
+        line(xmc, ymc, xn, yn, col=C["gold3"], w=1.2)
 
-    html_derecha_1 = generar_html_rectangulos(claves_derecha_1, "der1", "menu-derecha", restricciones=restricciones_banderas)
-    html_derecha_2 = generar_html_rectangulos(claves_derecha_2, "der2", "menu-derecha", restricciones=restricciones_banderas)
-    html_derecha_3 = generar_html_rectangulos(claves_derecha_3, "der3", "menu-derecha", restricciones=restricciones_banderas)
-    html_derecha_4 = generar_html_rectangulos(claves_derecha_4, "der4", "menu-derecha", restricciones=restricciones_banderas)
-    html_derecha_5 = generar_html_rectangulos(claves_derecha_5, "der5", "menu-derecha", restricciones=restricciones_banderas)
-    html_derecha_6 = generar_html_rectangulos(claves_derecha_6, "der6", "menu-derecha", restricciones=restricciones_banderas)
+        team_a_idx, team_b_idx = i * 2, i * 2 + 1
+        fill_a = f"url(#flag_{team_a_idx})" if team_a_idx in loaded_flags else "#111"
+        fill_b = f"url(#flag_{team_b_idx})" if team_b_idx in loaded_flags else "#111"
 
-    html_b13 = generar_html_rectangulos(claves_b13, "b13", "menu-derecha", restricciones=restricciones_banderas)
-    html_b14 = generar_html_rectangulos(claves_b14, "b14", "menu-derecha", restricciones=restricciones_banderas)
-    html_d13 = generar_html_rectangulos(claves_d13, "d13", "menu-derecha", restricciones=restricciones_banderas)
-    html_d14 = generar_html_rectangulos(claves_d14, "d14", "menu-derecha", restricciones=restricciones_banderas)
+        stroke_a, sw_a = C["gold"], 2.0
+        stroke_b, sw_b = C["gold"], 2.0
 
-    herencia_fija_js = json.dumps(herencia_fija)
-    herencia_conexiones_js = json.dumps(HERENCIA_CONEXIONES)
-    banderas_disponibles_js = []
-    for nombre, b64 in banderas_base64_dict.items():
-        banderas_disponibles_js.append({"nombre": nombre, "src": f"data:image/svg+xml;base64,{b64}"})
-    banderas_disponibles_js = json.dumps(banderas_disponibles_js)
-    todas_claves_js = json.dumps(todas_claves)
-    todas_claves_con_goles_js = json.dumps(todas_claves_con_goles)
+        filtro_a = ''
+        filtro_b = ''
 
-    html_completo = f"""
-    <!DOCTYPE html>
+        circle_ring(xa, ya, TEAM_NODE_R, fill=fill_a, stroke=stroke_a, sw=sw_a, cls="team-node", data_attrs=filtro_a)
+        circle_ring(xb, yb, TEAM_NODE_R, fill=fill_b, stroke=stroke_b, sw=sw_b, cls="team-node", data_attrs=filtro_b)
+
+        celda_a = mapeo_circulo_a_indice.get(team_a_idx)
+        celda_b = mapeo_circulo_a_indice.get(team_b_idx)
+        gol_label(xa, ya, goles_madre.get(celda_a))
+        gol_label(xb, yb, goles_madre.get(celda_b))
+
+        if i in r16_loaded:
+            stroke_r16 = aciertos_r16_stroke.get(i, C["gold"])
+            sw_r16 = 3.0 if i in aciertos_r16_stroke else 2.0
+            circle_ring(xn, yn, R16_NODE_R, fill=f"url(#flag_r16_{i})",
+                        stroke=stroke_r16, sw=sw_r16, cls="r16-node",
+                        data_attrs=f'data-node-idx="{i}"')
+            gol_label(xn, yn, goles_madre.get(r16_key_map.get(i)))
+        else:
+            dot(xn, yn, DOT_R, fill=C["dot"])
+
+        anchors_r16.append((xn, yn, pair_ang))
+
+    # ── R16 → QF ──
+    for i in range(8):
+        x0, y0, a0 = anchors_r16[i * 2]
+        x1, y1, a1 = anchors_r16[i * 2 + 1]
+        match_ang = (a0 + a1) / 2
+        xn, yn = pt(R8_R, match_ang)
+
+        aa, ab = min(a0, a1), max(a0, a1)
+        arc(R16_R, aa, ab, col=C["gold3"], w=1.2)
+
+        R_mid = R8_R + (R16_R - R8_R) * 0.45
+        xma, yma = pt(R_mid, a0)
+        xmb, ymb = pt(R_mid, a1)
+        xmc, ymc = pt(R_mid, match_ang)
+
+        line(x0, y0, xma, yma, col=C["gold3"], w=1.1)
+        line(x1, y1, xmb, ymb, col=C["gold3"], w=1.1)
+        line(xma, yma, xmb, ymb, col=C["gold3"], w=1.1)
+        line(xmc, ymc, xn, yn,   col=C["gold4"], w=1.1)
+
+        if i in qf_loaded:
+            stroke_qf = aciertos_qf_stroke.get(i, C["gold"])
+            sw_qf = 3.0 if i in aciertos_qf_stroke else 2.0
+            circle_ring(xn, yn, QF_NODE_R, fill=f"url(#flag_qf_{i})",
+                        stroke=stroke_qf, sw=sw_qf, cls="qf-node",
+                        data_attrs=f'data-node-idx="{i}"')
+            gol_label(xn, yn, goles_madre.get(qf_key_map.get(i)))
+        else:
+            dot(xn, yn, DOT_R, fill=C["dot"])
+
+        anchors_qf.append((xn, yn, match_ang))
+
+    # ── QF → SF ──
+    for i in range(4):
+        x0, y0, a0 = anchors_qf[i * 2]
+        x1, y1, a1 = anchors_qf[i * 2 + 1]
+        match_ang = (a0 + a1) / 2
+        xn, yn = pt(R4_R, match_ang)
+
+        aa, ab = min(a0, a1), max(a0, a1)
+        arc(R8_R, aa, ab, col=C["gold4"], w=1.1)
+
+        R_mid = R4_R + (R8_R - R4_R) * 0.45
+        xma, yma = pt(R_mid, a0)
+        xmb, ymb = pt(R_mid, a1)
+        xmc, ymc = pt(R_mid, match_ang)
+
+        line(x0, y0, xma, yma, col=C["gold4"], w=1.0)
+        line(x1, y1, xmb, ymb, col=C["gold4"], w=1.0)
+        line(xma, yma, xmb, ymb, col=C["gold4"], w=1.0)
+        line(xmc, ymc, xn, yn,   col=C["gold5"], w=1.0)
+
+        if i in sf_loaded:
+            stroke_sf = aciertos_sf_stroke.get(i, C["gold"])
+            sw_sf = 3.0 if i in aciertos_sf_stroke else 2.0
+            circle_ring(xn, yn, SF_NODE_R, fill=f"url(#flag_sf_{i})",
+                        stroke=stroke_sf, sw=sw_sf, cls="sf-node",
+                        data_attrs=f'data-node-idx="{i}"')
+            gol_label(xn, yn, goles_madre.get(sf_key_map.get(i)))
+        else:
+            dot(xn, yn, DOT_R, fill=C["dot"])
+
+        anchors_sf.append((xn, yn, match_ang))
+
+    # ── SF → Final ──
+    anchors_final = []
+    for i in range(2):
+        x0, y0, a0 = anchors_sf[i * 2]
+        x1, y1, a1 = anchors_sf[i * 2 + 1]
+        match_ang = (a0 + a1) / 2
+        xn, yn = pt(R2_R, match_ang)
+
+        aa, ab = min(a0, a1), max(a0, a1)
+        arc(R4_R, aa, ab, col=C["gold5"], w=1.0)
+
+        R_mid = R2_R + (R4_R - R2_R) * 0.45
+        xma, yma = pt(R_mid, a0)
+        xmb, ymb = pt(R_mid, a1)
+        xmc, ymc = pt(R_mid, match_ang)
+
+        line(x0, y0, xma, yma, col=C["gold5"], w=1.0)
+        line(x1, y1, xmb, ymb, col=C["gold5"], w=1.0)
+        line(xma, yma, xmb, ymb, col=C["gold5"], w=1.0)
+        line(xmc, ymc, xn, yn,   col=C["gold"],  w=1.0)
+
+        if i in final_loaded:
+            stroke_final = aciertos_final_stroke.get(i, C["gold"])
+            sw_final = 3.2 if i in aciertos_final_stroke else 2.2
+            circle_ring(xn, yn, FINAL_NODE_R, fill=f"url(#flag_final_{i})",
+                        stroke=stroke_final, sw=sw_final, cls="final-node",
+                        data_attrs=f'data-node-idx="{i}"')
+            gol_label(xn, yn, goles_madre.get(final_key_map.get(i)))
+        else:
+            dot(xn, yn, DOT_R + 1, fill=C["dot"])
+
+        anchors_final.append((xn, yn, match_ang))
+
+    # ── Final → Campeón ──
+    for r_ring, col, w in [(RF_OUT, C["gold"], 1.5), (RF_IN, C["gold"], 1.2)]:
+        conn_els.append(
+            f'<circle cx="{CX}" cy="{CY}" r="{r_ring}" '
+            f'fill="none" stroke="{col}" stroke-width="{w}"/>'
+        )
+
+    for xf, yf, af in anchors_final:
+        xo, yo = pt(RF_OUT, af)
+        xi, yi = pt(RF_IN,  af)
+        line(xf, yf, xo, yo, col=C["gold"],  w=1.2)
+        line(xo, yo, xi, yi, col=C["gold"],  w=1.2)
+        line(xi, yi, CX, CY, col=C["gold"],  w=1.0)
+
+    bg_els.append(f"""
+    <defs>
+      <radialGradient id="glow_grad" cx="50%" cy="50%" r="50%">
+        <stop offset="0%"   stop-color="#d4a843" stop-opacity="0.55"/>
+        <stop offset="45%"  stop-color="#8a6020" stop-opacity="0.20"/>
+        <stop offset="100%" stop-color="#0a0a0a" stop-opacity="0"/>
+      </radialGradient>
+    </defs>
+    <circle cx="{CX}" cy="{CY}" r="260" fill="url(#glow_grad)"/>
+    """)
+
+    node_els.append(
+        f'<circle cx="{CX}" cy="{CY}" r="{RC}" '
+        f'fill="#1a1200" stroke="{C["glow"]}" stroke-width="2.5"/>'
+    )
+
+    if 0 in champion_loaded:
+        node_els.append(
+            f'<circle cx="{CX}" cy="{CY}" r="{CHAMP_NODE_R}" '
+            f'fill="url(#flag_champion_0)" stroke="{C["glow"]}" stroke-width="2.5" '
+            f'class="champion-node" data-node-idx="0"/>'
+        )
+        gol_label(CX, CY, goles_madre.get(champion_key_map.get(0)))
+    else:
+        node_els.append(
+            f'<text x="{CX}" y="{CY + 9}" text-anchor="middle" '
+            f'font-size="26" font-family="serif">🏆</text>'
+        )
+
+    node_els.append(
+        f'<text x="{CX}" y="26" text-anchor="middle" fill="{C["gold"]}" '
+        f'font-size="24" font-family="serif" letter-spacing="5">{titulo}</text>'
+    )
+
+    for r_l, txt, col in [
+        (R16_R,  "R32",   C["gold3"]),
+        (R8_R,   "R16",   C["gold3"]),
+        (R4_R,   "QF",    C["gold3"]),
+        (R2_R,   "SF",    C["gold3"]),
+        (RF_OUT, "Final", C["gold"]),
+    ]:
+        xl = CX - r_l - 6
+        node_els.append(
+            f'<text x="{xl:.1f}" y="{CY + 4}" text-anchor="end" '
+            f'fill="{col}" font-size="8" font-family="monospace" opacity="0.6">{txt}</text>'
+        )
+
+    svg_body = "\n".join(bg_els) + "\n" + "\n".join(conn_els) + "\n" + "\n".join(node_els)
+
+    country_names_json = json.dumps(country_names, ensure_ascii=False)
+    r16_names_json = json.dumps({str(k): v for k, v in r16_names.items()}, ensure_ascii=False)
+    qf_names_json = json.dumps({str(k): v for k, v in qf_names.items()}, ensure_ascii=False)
+    sf_names_json = json.dumps({str(k): v for k, v in sf_names.items()}, ensure_ascii=False)
+    final_names_json = json.dumps({str(k): v for k, v in final_names.items()}, ensure_ascii=False)
+    champion_names_json = json.dumps({str(k): v for k, v in champion_names.items()}, ensure_ascii=False)
+
+    html = f"""<!DOCTYPE html>
+<html>
+<head>
+<style>
+  * {{ margin:0; padding:0; box-sizing:border-box; }}
+  body {{
+    background: #0a0a0a;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    min-height: 100vh;
+    padding-top: 50px;
+    overflow-y: hidden;
+  }}
+  .team-node, .r16-node, .qf-node, .sf-node, .final-node, .champion-node {{
+    cursor:pointer;
+    transition: stroke-width .15s, stroke .15s;
+  }}
+  .team-node:hover, .r16-node:hover, .qf-node:hover, .sf-node:hover, .final-node:hover {{
+    stroke:#f0d060 !important;
+    stroke-width:3.5 !important;
+  }}
+  .champion-node:hover {{
+    stroke:#f0e090 !important;
+    stroke-width:4 !important;
+  }}
+  #tip {{
+    position:fixed;
+    background:rgba(20,12,0,.93);
+    border:1px solid #b8972a;
+    color:#e8d080;
+    font:12px monospace;
+    padding:5px 10px;
+    border-radius:6px;
+    pointer-events:none;
+    display:none;
+    z-index:99;
+  }}
+</style>
+</head>
+<body>
+<div id="tip"></div>
+<svg width="{SIZE}" height="{SVG_HEIGHT}" viewBox="0 0 {SIZE} {SVG_HEIGHT}"
+     xmlns="http://www.w3.org/2000/svg" style="will-change: transform; contain: paint;">
+  <rect width="{SIZE}" height="{SVG_HEIGHT}" fill="#0a0a0a"/>
+  {svg_body}
+</svg>
+<script>
+const tip = document.getElementById('tip');
+let countryNames = {country_names_json};
+let r16Names = {r16_names_json};
+let qfNames = {qf_names_json};
+let sfNames = {sf_names_json};
+let finalNames = {final_names_json};
+let championNames = {champion_names_json};
+
+function wireTooltip(selector, namesObj, byIndexAttr) {{
+  document.querySelectorAll(selector).forEach((el, i) => {{
+    const key = byIndexAttr ? el.getAttribute('data-node-idx') : i;
+    el.addEventListener('mouseenter', e => {{
+      tip.style.display = 'block';
+      tip.textContent = namesObj[key] || 'Por definir';
+    }});
+    el.addEventListener('mousemove', e => {{
+      tip.style.left = (e.clientX + 14) + 'px';
+      tip.style.top  = (e.clientY - 6) + 'px';
+    }});
+    el.addEventListener('mouseleave', () => tip.style.display = 'none');
+  }});
+}}
+
+wireTooltip('.team-node', countryNames, false);
+wireTooltip('.r16-node', r16Names, true);
+wireTooltip('.qf-node', qfNames, true);
+wireTooltip('.sf-node', sfNames, true);
+wireTooltip('.final-node', finalNames, true);
+wireTooltip('.champion-node', championNames, true);
+</script>
+</body>
+</html>"""
+
+    return html
+
+
+# ════════════════════════════════════════════════════════════════════
+#  FUNCIÓN REUTILIZABLE: tabla de resultados con el diseño estándar
+# ════════════════════════════════════════════════════════════════════
+def construir_tabla_detalle_html(titulo, subtitulo, tabla_bloque):
+    return f"""<!DOCTYPE html>
     <html>
     <head>
     <style>
-    
-    /* Estilos del Loader */
-    #loader-container {{
-        position: fixed;
-        top: 0; left: 0;
-        width: 100%; height: 100%;
-        background-color: #0E1117;
+      * {{ margin:0; padding:0; box-sizing:border-box; }}
+      body {{
+        background: #0a0a0a;
+        font-family: 'Georgia', serif;
         display: flex;
         justify-content: center;
-        align-items: center;
-        z-index: 999999;
-        transition: opacity 0.5s ease;
-    }}
-    .spinner {{
-        border: 5px solid #333;
-        border-top: 5px solid #4CAF50;
-        border-radius: 50%;
-        width: 50px;
-        height: 50px;
-        animation: spin 1s linear infinite;
-    }}
-    @keyframes spin {{
-        0% {{ transform: rotate(0deg); }}
-        100% {{ transform: rotate(360deg); }}
-    }}
-    
-    /* Estilos para el botón deshabilitado */
-    #boton-enviar:disabled {{
-        background-color: #666;
-        cursor: not-allowed;
-        opacity: 0.6;
-    }}
-    
-    /* Animación de carga en el botón */
-    #boton-enviar.cargando {{
+        padding: 10px 20px 50px 20px;
+      }}
+      .page-wrap {{
         position: relative;
-        color: transparent;
-    }}
-    
-    #boton-enviar.cargando::after {{
-        content: "";
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        width: 20px;
-        height: 20px;
-        border: 3px solid #ffffff;
-        border-top: 3px solid #4CAF50;
-        border-radius: 50%;
-        animation: spin 0.8s linear infinite;
-    }}
-    
-    /* Mensaje de éxito */
-    .mensaje-exito {{
-        display: none;
-        padding: 15px;
-        background-color: #45a049;
-        color: white;
-        border-radius: 8px;
+        width: 100%;
+        max-width: 760px;
+      }}
+      h2.title {{
         text-align: center;
-        margin: 40px auto 20px auto;
-        max-width: 400px;
-        font-weight: bold;
+        color: #d4a843;
+        font-family: 'Georgia', serif;
+        font-weight: normal;
+        letter-spacing: 4px;
         font-size: 18px;
-    }}
-
-    /* --- Estilo para resaltar campos faltantes --- */
-    .rectangulo-container.falta-campo {{
-        outline: 3px solid #ff3333;
-        outline-offset: 2px;
-        border-radius: 15px;
-    }}
-    
-    /* --- NUEVO: Tooltip para mostrar el nombre del país al pasar el mouse --- */
-    #tooltip-pais {{
-        position: fixed;
-        background-color: rgba(30,30,30,0.95);
-        color: white;
-        padding: 6px 12px;
+        margin: 0 0 4px 0;
+        text-transform: uppercase;
+      }}
+      .subtitle {{
+        text-align: center;
+        color: #7a6535;
+        font-family: monospace;
+        font-size: 10px;
+        letter-spacing: 2px;
+        margin-bottom: 22px;
+        text-transform: uppercase;
+      }}
+      .divider {{
+        width: 100px;
+        height: 1px;
+        background: linear-gradient(90deg, transparent, #c8a84b, transparent);
+        margin: 0 auto 26px auto;
+      }}
+      .quiniela-table {{
+        width: 100%;
+        border-collapse: collapse;
+        background: rgba(20, 15, 5, 0.5);
+        border: 1px solid #3a2e10;
+        border-radius: 10px;
+        overflow: hidden;
+      }}
+      .quiniela-table thead th {{
+        background: linear-gradient(180deg, #1a1508, #110d04);
+        color: #e8d080;
+        font-family: monospace;
+        font-size: 11px;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        padding: 14px 10px;
+        border-bottom: 1px solid #c8a84b;
+        text-align: center;
+        font-weight: normal;
+      }}
+      .quiniela-row td {{
+        padding: 11px 10px;
+        text-align: center;
+        color: #d8cba8;
+        font-family: monospace;
+        font-size: 13px;
+        border-bottom: 1px solid #221a0a;
+        transition: background 0.15s;
+      }}
+      .quiniela-row:hover td {{
+        background: rgba(200, 168, 75, 0.08);
+        color: #f0d060;
+      }}
+      .quiniela-row:last-child td {{ border-bottom: none; }}
+      .col-num {{ color: #7a6535; width: 6%; }}
+      .col-celda {{ width: 10%; }}
+      .col-pais {{ width: 32%; text-align: left !important; padding-left: 18px !important; }}
+      .col-goles {{ color: #c8a84b; font-weight: bold; width: 12%; }}
+      .col-goles-madre {{ color: #e8d080; width: 14%; }}
+      .col-estado {{ width: 16%; }}
+      .col-comparacion {{ width: 20%; }}
+      .madre-ref {{ color: #6a5528; font-size: 11px; }}
+      .badge-ok {{
+        color: #3ddc6e;
+        border: 1px solid #2a8a4a;
+        background: rgba(61,220,110,0.08);
         border-radius: 6px;
+        padding: 2px 8px;
+        font-size: 11px;
+      }}
+      .badge-fail {{
+        color: #e0473e;
+        border: 1px solid #8a2a24;
+        background: rgba(224,71,62,0.08);
+        border-radius: 6px;
+        padding: 2px 8px;
+        font-size: 11px;
+      }}
+      .quiniela-footer td {{
+        padding: 12px 10px;
+        font-family: monospace;
+        border-top: 1px solid #c8a84b;
+        background: linear-gradient(180deg, #1a1508, #110d04);
+      }}
+      .footer-label {{
+        text-align: right !important;
+        color: #7a6535;
+        font-size: 11px;
+        letter-spacing: 1.5px;
+        text-transform: uppercase;
+      }}
+      .footer-valor {{
+        text-align: center;
+        color: #f0d060;
         font-size: 14px;
         font-weight: bold;
-        font-family: 'Roboto', sans-serif;
-        pointer-events: none;
-        z-index: 10000;
-        display: none;
-        white-space: nowrap;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.5);
-    }}
-
-    /* --- NUEVO: Pantalla de quiniela cerrada --- */
-    #pantalla-cerrada {{
-        position: fixed;
-        top: 0; left: 0;
-        width: 100%; height: 100%;
-        background-color: rgba(14, 17, 23, 0.95);
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        z-index: 10001; /* por encima de todo */
-        color: white;
+      }}
+      .empty-state {{
         text-align: center;
-    }}
-    .contenedor-cerrado {{
-        background-color: #161b22;
-        border: 1px solid #ff3333;
-        border-radius: 14px;
-        padding: 45px 35px;
-        max-width: 500px;
-        box-shadow: 0 12px 35px rgba(0, 0, 0, 0.7);
-    }}
-    .contenedor-cerrado h2 {{
-        font-size: 24px;
-        margin-bottom: 20px;
-    }}
-    .contenedor-cerrado p {{
-        font-size: 16px;
-        color: #8b949e;
-    }}
-    
-    /* 1. IMPORTAR LA FUENTE ROBOTO DESDE GOOGLE FONTS */
-    @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap');
-
-    /* 2. APLICARLA DE FORMA GLOBAL A TODO EL PROYECTO */
-    * {{
-        margin: 0; 
-        padding: 0; 
-        box-sizing: border-box; 
-        font-family: 'Roboto', sans-serif;
-    }}
-    
-    html, body {{ width: 100%; 
-        height: 100%; 
-        background-color: #0E1117; 
-        overflow: hidden; /* Evita que el navegador móvil colapse */
-        margin: 0;
-        padding: 0;}}
-        
-    body {{ padding: 20px; }}
-    
-    
-    #contenedor-master {{
-        width: 100%;
-        height: 100%;
-        overflow: auto;
-        -webkit-overflow-scrolling: touch; /* Activa el scroll suave en iOS y Android */
-        padding: 20px;
-    }}
-    
-
-    /* PANTALLA DE BIENVENIDA */
-    #pantalla-bienvenida {{
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background-color: rgba(14, 17, 23, 0.7);
-        backdrop-filter: blur(10px);
-        -webkit-backdrop-filter: blur(10px);
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        z-index: 9999;
-        transition: opacity 0.8s ease, visibility 0.8s ease;
-    }}
-
-    #pantalla-bienvenida.oculta {{
-        opacity: 0;
-        visibility: hidden;
-        pointer-events: none;
-    }}
-
-    .contenedor-bienvenida {{
-        background-color: #161b22;
-        border: 1px solid #4CAF50;
-        border-radius: 14px;
-        padding: 45px 35px;
-        width: 380px;
-        text-align: center;
-        box-shadow: 0 12px 35px rgba(0, 0, 0, 0.7);
-        transition: opacity 0.5s ease;
-        opacity: 1;
-    }}
-
-    .contenedor-bienvenida h1 {{
-        color: white;
-        font-size: 28px;
-        margin-bottom: 30px;
-    }}
-
-    .contenedor-bienvenida label {{
-        color: #03a9f4;
-        font-size: 18px;
-        display: block;
-        margin-bottom: 10px;
-    }}
-
-    .contenedor-bienvenida input {{
-        width: 300px;
-        height: 45px;
-        background-color: #1a1e26;
-        color: white;
-        border: 2px solid #4CAF50;
-        border-radius: 8px;
-        font-size: 18px;
-        padding: 0 15px;
-        text-align: center;
-        outline: none;
-    }}
-
-    .contenedor-bienvenida input:focus {{
-        outline: 0.5px solid #272ac5;
-        border: 0.5px solid #272ac5;
-        box-shadow: auto;
-    }}
-
-    .contenedor-bienvenida button {{
-        display: block;
-        margin: 25px auto 0;
-        padding: 12px 40px;
-        background-color: #4CAF50;
-        color: white;
-        border: none;
-        border-radius: 8px;
-        font-size: 18px;
-        cursor: pointer;
-        font-weight: bold;
-    }}
-
-    .contenedor-bienvenida button:hover {{
-        background-color: #45a049;
-    }}
-
-    #layout-principal {{
-        display: flex;
-        justify-content: flex-start; /* <-- EL CAMBIO CLAVE: Alinea a la izquierda en vez del centro */
-        gap: 40px;
-        width: fit-content; /* <-- Ayuda a que el contenedor respete el ancho de los hijos */
-        min-width: 1400px; 
-        position: relative;
-        padding-left: 20px; /* Un pequeño margen para que las banderas no se peguen al borde de la pantalla */
-        padding-right: 20px;
-        margin: 0 auto;
-        
-        zoom: 0.7;
-    }}
-
-    .lado-izquierdo, .lado-derecho {{
-        display: flex;
-        flex-direction: column;
-        justify-content: space-between;
-        min-height: calc(100vh - 120px);
-        position: relative;
-    }}
-
-    .columna {{ display: flex; flex-direction: column; align-items: flex-start; }}
-    .columna-desalineada {{ display: flex; flex-direction: column; align-items: flex-start; margin-top: 35px; position: relative; }}
-
-    .columna-s1, .columna-s2, .columna-w1 {{
-        display: flex; flex-direction: column; align-items: center;
-        justify-content: center; align-self: center;
-    }}
-    .columna-w1 {{ transform: translateY(-200px); position: relative;}}
-    .columna-s1 {{ transform: translateX(-50px); }}
-    .columna-s2 {{ transform: translateX(50px); }}
-
-    .columna-s1 .rectangulo-pulse, .columna-s2 .rectangulo-pulse {{ width: 150px; height: 150px; }}
-    .columna-w1 .rectangulo-pulse {{ width: 180px; height: 180px; }}
-
-    .columna-a15, .columna-c15 {{ display: flex; flex-direction: column; align-items: flex-start; margin-top: 70px; }}
-    .columna-b15, .columna-d15 {{ display: flex; flex-direction: column; align-items: flex-end; margin-top: 70px; }}
-
-    .columna-a15 .rectangulo-pulse, .columna-b15 .rectangulo-pulse,
-    .columna-c15 .rectangulo-pulse, .columna-d15 .rectangulo-pulse {{ width: 110px; height: 110px; }}
-
-    .columna-a15 .bandera-seleccionada, .columna-b15 .bandera-seleccionada,
-    .columna-c15 .bandera-seleccionada, .columna-d15 .bandera-seleccionada,
-    .columna-s1 .bandera-seleccionada, .columna-s2 .bandera-seleccionada,
-    .columna-w1 .bandera-seleccionada {{ object-fit: cover; }}
-
-    .espaciador-a14 {{ margin-top: 58px; }}
-
-    .columna-derecha {{ display: flex; flex-direction: column; align-items: flex-end; }}
-    .columna-derecha-desalineada {{ display: flex; flex-direction: column; align-items: flex-end; margin-top: 35px; position: relative; }}
-
-    .grupo-superior-izquierdo, .grupo-inferior-izquierdo,
-    .grupo-superior-derecho, .grupo-inferior-derecho {{
-        display: flex;
-        gap: 20px;
-        position: relative;
-    }}
-
-    .rectangulo-container {{
-        position: relative;
-        display: inline-block;
-        margin-bottom: 10px;
-    }}
-    .rectangulo-pulse {{
-        width: 77px; height: 54px; background-color: #FFFFFF; border-radius: 15px;
-        cursor: pointer; transition: transform 0.1s ease-in-out; border: 1px solid #ddd;
-        display: flex; align-items: center; justify-content: center; overflow: hidden;
-        position: relative;
-    }}
-    .clave-texto {{
-        display: none;
-        color: #000000; font-size: 12px; font-weight: bold;
-        pointer-events: none; position: relative; z-index: 1;
-    }}
-    .rectangulo-pulse:active {{ animation: pulse 0.4s ease-in-out; }}
-    @keyframes pulse {{
-        0% {{ transform: scale(1); }} 50% {{ transform: scale(0.92); }} 100% {{ transform: scale(1); }}
-    }}
-
-    .menu-banderas {{
-        display: none; position: absolute; top: 0; left: 0;
-        background-color: #595959; border: 1px solid #444444; border-radius: 8px;
-        padding: 8px; z-index: 1000; box-shadow: 0 2px 10px rgba(0,0,0,0.3);
-    }}
-    .menu-derecha {{ left: auto; right: 0; }}
-
-    .menu-banderas img {{
-        width: 40px; height: 30px; margin: 4px; cursor: pointer;
-        border: 2px solid transparent; border-radius: 3px;
-    }}
-    .menu-banderas img:hover {{ border-color: #4CAF50; }}
-    .bandera-seleccionada {{
-        width: 100%; height: 100%; object-fit: cover; border-radius: 15px;
-        position: absolute; top: 0; left: 0;
-    }}
-    .bandera-fija {{ opacity: 0.9; }}
-
-    /* Líneas horizontales (eje X) */
-    .linea-conectora {{
-        position: absolute;
-        top: 50%;
-        height: 2px;
-        width: 50px;
-        background-color: white;
-        pointer-events: none;
-        z-index: 0;
-    }}
-    .linea-derecha {{ right: -50px; }}
-    .linea-izquierda {{ left: -50px; }}
-    .linea-avance-derecha {{ right: -20px; width: 20px; }}
-    .linea-avance-izquierda {{ left: -20px; width: 20px; }}
-
-    /* Líneas verticales (eje Y) para pares */
-    .linea-vertical {{
-        position: absolute;
-        left: 50%;
-        width: 2px;
-        height: 8px;
-        background-color: white;
-        pointer-events: none;
-        z-index: 0;
-    }}
-    .linea-abajo {{ bottom: -8px; }}
-    .linea-arriba {{ top: -8px; }}
-
-    /* VS reducido */
-    .vs-separator {{
-        position: relative;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        width: 0;
-        margin: 0 30px;
-    }}
-    .vs-texto {{
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        color: white;
-        font-size: 20px;
-        font-weight: bold;
-        background-color: #0E1117;
-        padding: 4px 8px;
-        border-radius: 3px;
-        z-index: 2;
-        pointer-events: none;
-        line-height: 1;
-    }}
-    
-    /* Icono de la copa arriba de W1 */
-    #icono-copa {{
-        position: absolute;
-        top: -135px;
-        left: 50%;
-        transform: translateX(-50%);
-        width: 150px;
-        height: auto;
-        z-index: 5;
-        pointer-events: none;
-    }}
-
-    /* Conectores horizontales (SVG) */
-    .conector-a13 {{
-        position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 0;
-    }}
-    .conector-a13 svg {{
-        position: absolute; top: 0; left: 54%; width: 60px; height: 100%;
-    }}
-    .conector-a14 {{
-        position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 0;
-    }}
-    .conector-a14 svg {{
-        position: absolute; top: 0; left: 54%; width: 60px; height: 100%;
-    }}
-    .conector-c13 {{
-        position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 0;
-    }}
-    .conector-c13 svg {{
-        position: absolute; top: 0; left: 54%; width: 60px; height: 100%;
-    }}
-    .conector-c14 {{
-        position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 0;
-    }}
-    .conector-c14 svg {{
-        position: absolute; top: 0; left: 54%; width: 60px; height: 100%;
-    }}
-    .conector-b13 {{
-        position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 0;
-    }}
-    .conector-b13 svg {{
-        position: absolute; top: 0; right: 54%; width: 60px; height: 100%;
-    }}
-    .conector-b14 {{
-        position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 0;
-    }}
-    .conector-b14 svg {{
-        position: absolute; top: 0; right: 54%; width: 60px; height: 100%;
-    }}
-    .conector-d13 {{
-        position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 0;
-    }}
-    .conector-d13 svg {{
-        position: absolute; top: 0; right: 54%; width: 60px; height: 100%;
-    }}
-    .conector-d14 {{
-        position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 0; 
-    }}
-    .conector-d14 svg {{
-        position: absolute; top: 0; right: 54%; width: 60px; height: 100%; 
-    }}
-
-    /* Conectores verticales dentro de columnas */
-    .conector-a13-a14 {{
-        position: absolute; top: 54px; left: 50%; width: 2px; height: 68px;
-        background-color: white; pointer-events: none; z-index: 0;
-    }}
-    .conector-c13-c14 {{
-        position: absolute; top: 54px; left: 50%; width: 2px; height: 68px;
-        background-color: white; pointer-events: none; z-index: 0;
-    }}
-    .conector-b13-b14 {{
-        position: absolute; top: 54px; left: 50%; width: 3px; height: 68px;
-        background-color: white; pointer-events: none; z-index: 0;
-    }}
-    .conector-d13-d14 {{
-        position: absolute; top: 54px; left: 50%; width: 3px; height: 68px;
-        background-color: white; pointer-events: none; z-index: 0;
-    }}
-
-    /* Horizontales hacia A15, B15, C15, D15 */
-    .conector-a15-horizontal {{
-        position: absolute; top: 88px; left: 50%; width: 130px; height: 3px;
-        background-color: white; pointer-events: none; z-index: 0;
-    }}
-    .conector-c15-horizontal {{
-        position: absolute; top: 88px; left: 50%; width: 130px; height: 3px;
-        background-color: white; pointer-events: none; z-index: 0;
-    }}
-    .conector-b15-horizontal {{
-        position: absolute; top: 88px; right: 50%; width: 60px; height: 3px;
-        background-color: white; pointer-events: none; z-index: 0;
-    }}
-    .conector-d15-horizontal {{
-        position: absolute; top: 88px; right: 50%; width: 60px; height: 3px;
-        background-color: white; pointer-events: none; z-index: 0;
-    }}
-
-    /* LÍNEAS VERTICALES A15‑C15 y B15‑D15 */
-    .conector-a15-c15 {{
-        position: absolute;
-        left: 90%;
-        margin-left: -1px;
-        width: 2px;
-        top: 50%;
-        transform: translateY(-50%);
-        height: 415px;
-        background-color: white;
-        pointer-events: none;
-        z-index: 0;
-    }}
-
-    .conector-b15-d15 {{
-        position: absolute;
-        left: 10%;
-        margin-left: -1px;
-        width: 2px;
-        top: 50%;
-        transform: translateY(-50%);
-        height: 415px;
-        background-color: white;
-        pointer-events: none;
-        z-index: 0;
-    }}
-
-    /* NUEVA LÍNEA HORIZONTAL DESDE EL CENTRO DE A15‑C15 HACIA S1 */
-    .conector-s1-horizontal {{
-        position: absolute;
-        top: 387px;
-        left: 90%;
-        width: 100px;
-        height: 2px;
-        background-color: white;
-        pointer-events: none;
-        z-index: 0;
-        transform: translateY(-50%);
-    }}
-    
-    .conector-s2-horizontal {{
-        position: absolute;
-        top: 360px;
-        right: 10%;
-        width: 100px;
-        height: 2px;
-        background-color: white;
-        pointer-events: none;
-        z-index: 0;
-        transform: translateX(-142%);
-    }}
-    
-    .conector-s1-s2 {{
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        width: 420px;
-        height: 2px;
-        background-color: white;
-        pointer-events: none;
-        z-index: 0;
-    }}
-    
-    .conector-w1-vertical {{
-        position: absolute;
-        bottom: 50%;
-        left: 50%;
-        transform: translateX(-50%);
-        width: 2px;
-        height: 115px;
-        background-color: white;
-        pointer-events: none;
-        z-index: 0;
-    }}
-    
-    /* NUEVO: INPUT DE GOLES */
-    .input-goles {{
-        position: absolute;
-        bottom: 0px;
-        left: 50%;
-        transform: translateX(-50%);
-        width: 32px;
-        height: 20px;
-        background-color: #0E1117;
-        color: white;
-        border: 2px solid #4CAF50;
-        border-radius: 5px;
-        text-align: center;
-        font-size: 12px;
-        font-weight: bold;
-        z-index: 10;
-        outline: none;
-        display: none;
-    }}
-
-    .input-goles:focus {{
-        border-color: #03a9f4;
-        background-color: #1a1e26;
-    }}
-
-    .input-goles::-webkit-inner-spin-button, 
-    .input-goles::-webkit-outer-spin-button {{
-        -webkit-appearance: none; 
-        margin: 0; 
-    }}
-    .input-goles[type=number] {{
-        -moz-appearance: textfield;
-    }}
-
-    #boton-enviar {{
-        display: block; margin: 20px auto; padding: 10px 20px;
-        background-color: #4CAF50; color: white; border: none;
-        border-radius: 5px; cursor: pointer; font-size: 16px;
-    }}
-    #boton-enviar:hover {{ background-color: #45a049; }}
-    #mensaje-terminal {{ color: white; text-align: center; margin-top: 30px;}}
+        color: #7a6535;
+        font-family: monospace;
+        font-size: 13px;
+        padding: 50px 20px;
+        border: 1px dashed #3a2e10;
+        border-radius: 10px;
+      }}
     </style>
     </head>
     <body>
-
-    <!-- PANTALLA DE QUINIELA CERRADA -->
-    <div id="pantalla-cerrada">
-        <div class="contenedor-cerrado">
-            <h2>ESTA QUINIELA SE HA CERRADO</h2>
-            <p>Los resultados aparecerán en esta misma página a partir del día Lunes 29 de Junio al término del día.</p>
-            <p>Todos los dias se publicarán los resultados</p>
-        </div>
-    </div>
-    
-    <div id="loader-container">
-        <div class="spinner"></div>
-    </div>
-
-    
-    <div id="contenedor-master">
-
-
-        <!-- PANTALLA DE BIENVENIDA -->
-        <div id="pantalla-bienvenida">
-            <div class="contenedor-bienvenida" id="paso-1">
-                <h1 style="margin-bottom: 12px; font-size: 24px;">Quiniela 90.9 // Fase 2</h1>
-                <p style="color: #8b949e; font-size: 14px; margin-bottom: 25px; line-height: 1.5;">Por favor ingresa tu nombre para comenzar :)</p>
-                <input type="text" id="input-nombre" placeholder="Ingresa tu nombre" autocomplete="off" style="margin-bottom: 25px; width: 100%; box-sizing: border-box;">
-                <button onclick="irAPaso2()" style="width: 100%;">SIGUIENTE</button>
-            </div>
-            <div class="contenedor-bienvenida" id="paso-2" style="display: none; opacity: 0;">
-                <h1 style="margin-bottom: 12px; font-size: 24px;">Instrucciones</h1>
-                <ul style="color: #8b949e; font-size: 14px; margin-bottom: 25px; line-height: 1.6; text-align: left; padding-left: 20px;">
-                    <li><strong></strong> Selecciona los equipos ganadores haciendo clic en los espacios vacíos de cada llave.</li>
-                    <li><strong></strong> Una vez elegida la bandera, ingresa los goles del equipo en el recuadro que aparecerá debajo.</li>
-                    <li><strong></strong> Continúa este proceso hasta llegar al recuadro central del Campeón.</li>
-                    <li><strong></strong> Importante: Sigue las llaves correctamente.</li>
-                    <li><strong></strong> Al finalizar, haz clic en el botón verde "LISTO".</li>
-                </ul>
-                <button onclick="iniciarApp()" style="width: 100%;">COMENZAR</button>
-            </div>
-        </div>
-
-        <div id="layout-principal">
-            <div class="lado-izquierdo">
-                <div class="grupo-superior-izquierdo">
-                    <div class="columna"> {html_izquierda_1} </div>
-                    <div class="vs-separator"><span class="vs-texto">VS</span></div>
-                    <div class="columna"> {html_izquierda_2} </div>
-                    <div class="columna"> {html_izquierda_3} </div>
-                    <div class="conector-a13">
-                        <svg viewBox="0 0 55 300" preserveAspectRatio="none">
-                            <line x1="0" y1="70" x2="55" y2="70" stroke="white" stroke-width="2" />
-                        </svg>
-                    </div>
-                    <div class="conector-a14">
-                        <svg viewBox="0 0 55 300" preserveAspectRatio="none">
-                            <line x1="0" y1="220" x2="55" y2="220" stroke="white" stroke-width="2" />
-                        </svg>
-                    </div>
-                    <div class="columna-desalineada">
-                        {html_a13}
-                        <div class="conector-a13-a14"></div>
-                        <div class="conector-a15-horizontal"></div>
-                        <div class="espaciador-a14"> {html_a14} </div>
-                    </div>
-                    <div class="columna-a15"> {html_a15} </div>
-                </div>
-                <div class="conector-a15-c15"></div>
-                <div class="conector-s1-horizontal"></div>
-                <div class="grupo-inferior-izquierdo">
-                    <div class="columna"> {html_izquierda_4} </div>
-                    <div class="vs-separator"><span class="vs-texto">VS</span></div>
-                    <div class="columna"> {html_izquierda_5} </div>
-                    <div class="columna"> {html_izquierda_6} </div>
-                    <div class="conector-c13">
-                        <svg viewBox="0 0 55 300" preserveAspectRatio="none">
-                            <line x1="0" y1="70" x2="55" y2="70" stroke="white" stroke-width="2" />
-                        </svg>
-                    </div>
-                    <div class="conector-c14">
-                        <svg viewBox="0 0 55 300" preserveAspectRatio="none">
-                            <line x1="0" y1="220" x2="55" y2="220" stroke="white" stroke-width="2" />
-                        </svg>
-                    </div>
-                    <div class="columna-desalineada">
-                        {html_c13}
-                        <div class="conector-c13-c14"></div>
-                        <div class="conector-c15-horizontal"></div>
-                        <div class="espaciador-a14"> {html_c14} </div>
-                    </div>
-                    <div class="columna-c15"> {html_c15} </div>
-                </div>
-            </div>
-            
-            <div class="conector-s1-s2"></div>
-            <div class="conector-w1-vertical"></div>
-
-            <div class="columna-s1"> {html_s1} </div>
-            <div class="columna-w1"><img src="data:image/x-icon;base64,{icono_base64}" id="icono-copa" alt="Copa Ibero">{html_w1}</div>
-            <div class="columna-s2"> {html_s2} </div>
-
-            <div class="lado-derecho">
-                <div class="grupo-superior-derecho">
-                    <div class="columna-b15"> {html_b15} </div>
-                    <div class="columna-derecha-desalineada">
-                        {html_b13}
-                        <div class="conector-b13-b14"></div>
-                        <div class="conector-b15-horizontal"></div>
-                        <div class="conector-s2-horizontal"></div>
-                        <div class="espaciador-a14"> {html_b14} </div>
-                    </div>
-                    <div class="conector-b13">
-                        <svg viewBox="0 0 55 300" preserveAspectRatio="none">
-                            <line x1="55" y1="70" x2="0" y2="70" stroke="white" stroke-width="2" />
-                        </svg>
-                    </div>
-                    <div class="conector-b14">
-                        <svg viewBox="0 0 55 300" preserveAspectRatio="none">
-                            <line x1="55" y1="220" x2="0" y2="220" stroke="white" stroke-width="2" />
-                        </svg>
-                    </div>
-                    <div class="columna-derecha"> {html_derecha_3} </div>
-                    <div class="columna-derecha"> {html_derecha_2} </div>
-                    <div class="vs-separator"><span class="vs-texto">VS</span></div>
-                    <div class="columna-derecha"> {html_derecha_1} </div>
-                </div>
-                <div class="conector-b15-d15"></div>
-                <div class="grupo-inferior-derecho">
-                    <div class="columna-d15"> {html_d15} </div>
-                    <div class="columna-derecha-desalineada">
-                        {html_d13}
-                        <div class="conector-d13-d14"></div>
-                        <div class="conector-d15-horizontal"></div>
-                        <div class="espaciador-a14"> {html_d14} </div>
-                    </div>
-                    <div class="conector-d13">
-                        <svg viewBox="0 0 55 300" preserveAspectRatio="none">
-                            <line x1="55" y1="70" x2="0" y2="70" stroke="white" stroke-width="2" />
-                        </svg>
-                    </div>
-                    <div class="conector-d14">
-                        <svg viewBox="0 0 55 300" preserveAspectRatio="none">
-                            <line x1="55" y1="220" x2="0" y2="220" stroke="white" stroke-width="2" />
-                        </svg>
-                    </div>
-                    <div class="columna-derecha"> {html_derecha_6} </div>
-                    <div class="columna-derecha"> {html_derecha_5} </div>
-                    <div class="vs-separator"><span class="vs-texto">VS</span></div>
-                    <div class="columna-derecha"> {html_derecha_4} </div>
-                </div>
-            </div>
-        </div>
-
-        <button id="boton-enviar" onclick="enviarDatos()">LISTO</button>
-        <div class="mensaje-exito" id="mensaje-exito">¡Datos enviados correctamente!</div>
-        <div id="mensaje-terminal"></div>
-
-    </div>
-
-    <!-- NUEVO: Tooltip para nombres de países -->
-    <div id="tooltip-pais"></div>
-
-    <script>
-    var datosRectangulos = {{}};
-    var HERENCIA_FIJA = {herencia_fija_js};
-    var HERENCIA_CONEXIONES = {herencia_conexiones_js};
-    var BANDERAS_DISPONIBLES = {banderas_disponibles_js};
-    var TODAS_LAS_CLAVES = {todas_claves_js};
-    var TODAS_LAS_CLAVES_GOLES = {todas_claves_con_goles_js};
-    var datosGoles = {{}};
-    var nombreParticipante = "";
-    var datosEnviados = false;
-
-    var NOMBRES_PAISES = {{
-        "de.svg": "Alemania", "gb-sct.svg": "Escocia", "no.svg": "Noruega",
-        "se.svg": "Suecia", "kr.svg": "Corea del Sur", "ch.svg": "Suiza",
-        "nl.svg": "Países Bajos", "ma.svg": "Marruecos", "br.svg": "Brasil",
-        "jp.svg": "Japón", "ci.svg": "Costa de Marfil", "fr.svg": "Francia",
-        "mx.svg": "México", "cv.svg": "Cabo Verde", "gb-eng.svg": "Inglaterra",
-        "pt.svg": "Portugal", "cd.svg": "RD Congo", "gh.svg": "Ghana",
-        "es.svg": "España", "at.svg": "Austria", "us.svg": "Estados Unidos",
-        "ec.svg": "Ecuador", "eg.svg": "Egipto", "cz.svg": "República Checa",
-        "ar.svg": "Argentina", "uy.svg": "Uruguay", "au.svg": "Australia",
-        "ir.svg": "Irán", "ca.svg": "Canadá", "be.svg": "Bélgica",
-        "py.svg": "Paraguay", "sn.svg": "Senegal", "pl.svg": "Polonia",
-        "za.svg": "Sudáfrica", "dk.svg": "Dinamarca", "tn.svg": "Túnez",
-        "ba.svg": "Bosnia y Herzegovina",
-        "sn.svg": "Senegal",
-        "dz.svg": "Argelia",
-        "co.svg": "Colombia", "hr.svg": "Croacia"
-    }};
-
-    for (var clave in HERENCIA_FIJA) {{
-        datosRectangulos[clave] = HERENCIA_FIJA[clave];
-    }}
-    
-    // Tooltip
-    function mostrarTooltipPais(event) {{
-        var rect = event.currentTarget;
-        var clave = rect.getAttribute('data-key');
-        if (clave && datosRectangulos[clave]) {{
-            var nombreArchivo = datosRectangulos[clave];
-            var nombrePais = NOMBRES_PAISES[nombreArchivo] || nombreArchivo;
-            var tooltip = document.getElementById('tooltip-pais');
-            tooltip.textContent = nombrePais;
-            tooltip.style.display = 'block';
-            tooltip.style.left = (event.clientX + 15) + 'px';
-            tooltip.style.top = (event.clientY + 15) + 'px';
-        }}
-    }}
-
-    function ocultarTooltipPais() {{
-        var tooltip = document.getElementById('tooltip-pais');
-        tooltip.style.display = 'none';
-    }}
-
-    function moverTooltipPais(event) {{
-        var tooltip = document.getElementById('tooltip-pais');
-        if (tooltip.style.display === 'block') {{
-            tooltip.style.left = (event.clientX + 15) + 'px';
-            tooltip.style.top = (event.clientY + 15) + 'px';
-        }}
-    }}
-
-    // Asignar eventos a todos los rectángulos cuando la página cargue
-    window.addEventListener('load', function() {{
-        var rectangulos = document.querySelectorAll('.rectangulo-pulse');
-        rectangulos.forEach(function(rect) {{
-            rect.addEventListener('mouseenter', mostrarTooltipPais);
-            rect.addEventListener('mouseleave', ocultarTooltipPais);
-            rect.addEventListener('mousemove', moverTooltipPais);
-        }});
-    }});
-
-    // Lógica para ocultar el loader cuando la página cargue totalmente
-    setTimeout(function() {{
-        var loader = document.getElementById('loader-container');
-        if (loader) {{
-            loader.style.opacity = '0';
-            setTimeout(function() {{
-                loader.style.display = 'none';
-            }}, 500);
-        }}
-    }}, 1000);
-
-    // Prevenir recarga accidental
-    window.addEventListener('beforeunload', function(e) {{
-        if (datosEnviados) {{
-            return;
-        }}
-        
-        var hayDatos = false;
-        for (var clave in datosRectangulos) {{
-            if (!HERENCIA_FIJA.hasOwnProperty(clave)) {{
-                hayDatos = true;
-                break;
-            }}
-        }}
-        
-        if (hayDatos && !datosEnviados) {{
-            e.preventDefault();
-            e.returnValue = 'Tienes datos sin guardar. ¿Estás seguro de que quieres salir?';
-            return e.returnValue;
-        }}
-    }});
-
-    function irAPaso2() {{
-        var input = document.getElementById('input-nombre');
-        var nombre = input.value.trim();
-        
-        if (nombre === "") {{
-            alert("Por favor escribe tu nombre antes de continuar.");
-            return;
-        }}
-        
-        nombreParticipante = nombre;
-
-        var paso1 = document.getElementById('paso-1');
-        paso1.style.opacity = '0';
-
-        setTimeout(function() {{
-            paso1.style.display = 'none';
-            
-            var paso2 = document.getElementById('paso-2');
-            paso2.style.display = 'block';
-            
-            setTimeout(function() {{
-                paso2.style.opacity = '1';
-            }}, 50);
-        }}, 500);
-    }}
-
-    function iniciarApp() {{
-        document.getElementById('pantalla-bienvenida').classList.add('oculta');
-        console.log("Participante: " + nombreParticipante);
-    }}
-
-    (function() {{
-        var clavesFijas = Object.keys(HERENCIA_FIJA);
-        clavesFijas.forEach(function(clave) {{
-            var input = document.getElementById('goles-' + clave);
-            if (input) {{
-                input.style.display = 'block';
-            }}
-        }});
-    }})();
-
-    function mostrarMenu(event, rectanguloId) {{
-        if (datosEnviados) return;
-        
-        var menu = document.getElementById('menu-' + rectanguloId);
-        if (!menu) return;
-        var container = menu.parentElement;
-        var rectangulo = container.querySelector('.rectangulo-pulse');
-        var clave = rectangulo.getAttribute('data-key');
-        var bloqueado = rectangulo.getAttribute('data-bloqueado');
-        
-        if (bloqueado === 'true' || HERENCIA_FIJA.hasOwnProperty(clave)) {{
-            return;
-        }}
-
-        // Lógica optimizada: Solo dibujamos las banderas necesarias
-        var banderasParaMostrar = [];
-        
-        if (HERENCIA_CONEXIONES.hasOwnProperty(clave)) {{
-            var padres = HERENCIA_CONEXIONES[clave];
-            var banderasPermitidas = [];
-            for (var p = 0; p < padres.length; p++) {{
-                var banderaPadre = datosRectangulos[padres[p]];
-                if (banderaPadre && banderasPermitidas.indexOf(banderaPadre) === -1) {{
-                    banderasPermitidas.push(banderaPadre);
-                }}
-            }}
-            for (var b = 0; b < BANDERAS_DISPONIBLES.length; b++) {{
-                if (banderasPermitidas.indexOf(BANDERAS_DISPONIBLES[b].nombre) !== -1) {{
-                    banderasParaMostrar.push(BANDERAS_DISPONIBLES[b]);
-                }}
-            }}
-        }} else {{
-            banderasParaMostrar = BANDERAS_DISPONIBLES; // Nodos iniciales libres
-        }}
-
-        // Construir el menú dinámicamente SOLO si está vacío
-        if (menu.innerHTML.trim() === '') {{
-            for (var i = 0; i < banderasParaMostrar.length; i++) {{
-                var img = document.createElement('img');
-                img.src = banderasParaMostrar[i].src;
-                img.setAttribute('data-nombre', banderasParaMostrar[i].nombre);
-                img.onclick = function() {{ seleccionarBandera(this, this.src); }};
-                menu.appendChild(img);
-            }}
-        }}
-
-        event.stopPropagation();
-        var menus = document.getElementsByClassName('menu-banderas');
-        for (var i = 0; i < menus.length; i++) {{
-            if (menus[i].id !== 'menu-' + rectanguloId) menus[i].style.display = 'none';
-        }}
-        menu.style.display = (menu.style.display === 'block') ? 'none' : 'block';
-    }}
-
-    function seleccionarBandera(imgElement, banderaSrc) {{
-        // No permitir interacción si ya se enviaron los datos
-        if (datosEnviados) {{
-            return;
-        }}
-        
-        var menu = imgElement.parentElement;
-        var container = menu.parentElement;
-        var rectangulo = container.querySelector('.rectangulo-pulse');
-        var clave = rectangulo.getAttribute('data-key');
-        if (HERENCIA_FIJA.hasOwnProperty(clave)) {{
-            console.log("No se puede modificar " + clave);
-            menu.style.display = 'none';
-            return;
-        }}
-        var claveSpan = rectangulo.querySelector('.clave-texto');
-        var claveTexto = claveSpan ? claveSpan.textContent : clave;
-        rectangulo.innerHTML = '<img src="' + banderaSrc + '" class="bandera-seleccionada">';
-        var claveSpanNuevo = document.createElement('span');
-        claveSpanNuevo.className = 'clave-texto';
-        claveSpanNuevo.textContent = claveTexto;
-        rectangulo.appendChild(claveSpanNuevo);
-        menu.style.display = 'none';
-        var nombreBandera = imgElement.getAttribute('data-nombre');
-        datosRectangulos[clave] = nombreBandera;
-        
-        // Solo muestra input de goles si la clave lo tiene (W1 no tiene)
-        var inputGoles = container.querySelector('.input-goles');
-        if (inputGoles) {{
-            inputGoles.style.display = 'block';
-            inputGoles.value = '';
-            datosGoles[clave] = '';
-        }}
-        
-        // Si se selecciona bandera, quitamos la marca de falta si la tenía
-        container.classList.remove('falta-campo');
-        
-        console.log("Bandera actualizada | Clave: " + clave + " | Bandera: " + nombreBandera);
-    }}
-    
-    function obtenerISO8601CDMX() {{
-        var d = new Date();
-        var y = d.getUTCFullYear();
-        var m = d.getUTCMonth();      // 0-11
-        var dia = d.getUTCDate();
-        var h = d.getUTCHours();
-        var min = d.getUTCMinutes();
-        var s = d.getUTCSeconds();
-        var ms = d.getUTCMilliseconds();
-        // Restar 6 horas para CDMX (UTC-6, sin horario de verano)
-        h -= 6;
-        if (h < 0) {{
-            h += 24;
-            dia--;
-            if (dia < 1) {{
-                m--;
-                if (m < 0) {{
-                    m = 11;
-                    y--;
-                }}
-                var diasMes = new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
-                dia = diasMes;
-            }}
-        }}
-        var pad = function(n) {{ return n < 10 ? '0' + n : '' + n; }};
-        var padMs = function(n) {{
-            if (n < 10) return '00' + n;
-            if (n < 100) return '0' + n;
-            return '' + n;
-        }};
-        return y + '-' + pad(m + 1) + '-' + pad(dia) + 'T' +
-               pad(h) + ':' + pad(min) + ':' + pad(s) + '.' + padMs(ms);
-    }}
-    
-    // --- FUNCIONES PARA MARCAR / DESMARCAR CAMPOS FALTANTES ---
-    function marcarCamposFaltantes() {{
-        limpiarMarcas();  // Primero quitamos todas las marcas
-        
-        // Revisar banderas en TODAS las claves
-        for (var i = 0; i < TODAS_LAS_CLAVES.length; i++) {{
-            var clave = TODAS_LAS_CLAVES[i];
-            if (!(clave in datosRectangulos)) {{
-                var container = document.querySelector('.rectangulo-pulse[data-key="' + clave + '"]');
-                if (container) {{
-                    container = container.closest('.rectangulo-container');
-                    if (container) container.classList.add('falta-campo');
-                }}
-            }}
-        }}
-        
-        // Revisar goles SOLO en claves que lo requieren (excluye W1)
-        for (var j = 0; j < TODAS_LAS_CLAVES_GOLES.length; j++) {{
-            var claveG = TODAS_LAS_CLAVES_GOLES[j];
-            var faltaGoles = !(claveG in datosGoles) || datosGoles[claveG] === "" || datosGoles[claveG] === undefined;
-            if (faltaGoles) {{
-                var containerG = document.querySelector('.rectangulo-pulse[data-key="' + claveG + '"]');
-                if (containerG) {{
-                    containerG = containerG.closest('.rectangulo-container');
-                    if (containerG) containerG.classList.add('falta-campo');
-                }}
-            }}
-        }}
-    }}
-    
-    function limpiarMarcas() {{
-        var marcados = document.querySelectorAll('.rectangulo-container.falta-campo');
-        for (var j = 0; j < marcados.length; j++) {{
-            marcados[j].classList.remove('falta-campo');
-        }}
-    }}
-    
-    // Modificamos guardarGoles para quitar la marca al escribir
-    function guardarGoles(inputElement) {{
-        if (datosEnviados) {{
-            inputElement.value = datosGoles[inputElement.getAttribute('data-key')] || '';
-            return;
-        }}
-        
-        var clave = inputElement.getAttribute('data-key');
-        var goles = inputElement.value;
-        datosGoles[clave] = goles;
-        
-        // Si ahora el campo tiene valor, quitar marca roja
-        var container = inputElement.closest('.rectangulo-container');
-        if (container) {{
-            container.classList.remove('falta-campo');
-        }}
-        
-        console.log("Goles actualizados | Clave: " + clave + " | Goles: " + goles);
-    }}
-
-    async function enviarDatos() {{
-        if (datosEnviados) {{
-            alert("Los datos ya fueron enviados. No es posible enviarlos nuevamente.");
-            return;
-        }}
-        
-        // Limpiar marcas previas antes de validar
-        limpiarMarcas();
-        
-        var faltanBanderas = [];
-        var faltanGoles = [];
-        
-        // Validar banderas en TODAS las claves
-        for (var i = 0; i < TODAS_LAS_CLAVES.length; i++) {{
-            var clave = TODAS_LAS_CLAVES[i];
-            if (!(clave in datosRectangulos)) {{
-                faltanBanderas.push(clave);
-            }}
-        }}
-        
-        // Validar goles solo en claves que lo requieren
-        for (var j = 0; j < TODAS_LAS_CLAVES_GOLES.length; j++) {{
-            var claveG = TODAS_LAS_CLAVES_GOLES[j];
-            if (!(claveG in datosGoles) || datosGoles[claveG] === "" || datosGoles[claveG] === undefined) {{
-                faltanGoles.push(claveG);
-            }}
-        }}
-        
-        if (faltanBanderas.length > 0 || faltanGoles.length > 0) {{
-            // Marcar visualmente los campos faltantes
-            marcarCamposFaltantes();
-            
-            var mensaje = "⚠️ No se puede enviar.";
-            if (faltanBanderas.length > 0 && faltanGoles.length > 0) {{
-                mensaje += "\\n\\nFaltan banderas por seleccionar y goles por ingresar.";
-            }} else if (faltanBanderas.length > 0) {{
-                mensaje += "\\n\\nFaltan banderas por seleccionar.";
-            }} else if (faltanGoles.length > 0) {{
-                mensaje += "\\n\\nFaltan goles por ingresar.";
-            }}
-            alert(mensaje);
-            return;
-        }}
-        
-        var boton = document.getElementById('boton-enviar');
-        var mensajeExito = document.getElementById('mensaje-exito');
-        
-        boton.disabled = true;
-        boton.classList.add('cargando');
-        boton.textContent = 'Enviando...';
-        
-        var filas = [];
-        for (var clave in datosRectangulos) {{
-            var nombreArchivo = datosRectangulos[clave];
-            var pais = NOMBRES_PAISES[nombreArchivo] || nombreArchivo;
-            var goles = datosGoles[clave];
-            var golesInt = (goles !== undefined && goles !== "") ? parseInt(goles) : null;
-            filas.push({{
-                nombre: nombreParticipante,
-                celda: clave,
-                pais: pais,
-                goles: golesInt,
-                created_at: obtenerISO8601CDMX()
-            }});
-        }}
-
-        console.log("Enviando a Supabase...");
-        console.log(JSON.stringify(filas, null, 2));
-
-        var SUPABASE_URL = "{st.secrets['SUPABASE_URL']}";
-        var SUPABASE_ANON_KEY = "{st.secrets['SUPABASE_KEY']}";
-
-        try {{
-            var response = await fetch(SUPABASE_URL + "/rest/v1/Quiniela_Fase2", {{
-                method: "POST",
-                headers: {{
-                    "Content-Type": "application/json",
-                    "apikey": SUPABASE_ANON_KEY,
-                    "Authorization": "Bearer " + SUPABASE_ANON_KEY,
-                    "Prefer": "return=minimal"
-                }},
-                body: JSON.stringify(filas)
-            }});
-
-            if (response.ok) {{
-                datosEnviados = true;
-                boton.style.display = 'none';
-                mensajeExito.style.display = 'block';
-                document.getElementById('mensaje-terminal').textContent = 
-                    "Registros guardados para " + nombreParticipante;
-                deshabilitarInteraccion();
-                console.log("Datos enviados exitosamente");
-            }} else {{
-                boton.disabled = false;
-                boton.classList.remove('cargando');
-                boton.textContent = 'LISTO';
-                var error = await response.text();
-                console.error("Error Supabase:", error);
-                alert("Error al guardar los datos. Revisa conexión o intenta nuevamente.");
-            }}
-        }} catch (err) {{
-            boton.disabled = false;
-            boton.classList.remove('cargando');
-            boton.textContent = 'LISTO';
-            console.error("Error de red:", err);
-            alert("No se pudo conectar a la base de datos.");
-        }}
-    }}
-    
-    function deshabilitarInteraccion() {{
-        var rectangulos = document.querySelectorAll('.rectangulo-pulse');
-        rectangulos.forEach(function(rect) {{
-            rect.style.pointerEvents = 'none';
-            rect.style.opacity = '0.7';
-        }});
-        
-        var inputs = document.querySelectorAll('.input-goles');
-        inputs.forEach(function(input) {{
-            input.disabled = true;
-            input.style.opacity = '0.7';
-        }});
-        
-        var menus = document.querySelectorAll('.menu-banderas');
-        menus.forEach(function(menu) {{
-            menu.style.display = 'none';
-        }});
-    }}
-
-    document.addEventListener('click', function(event) {{
-        var menus = document.getElementsByClassName('menu-banderas');
-        for (var i = 0; i < menus.length; i++) {{
-            if (!menus[i].contains(event.target)) {{
-                var rectanguloContainer = menus[i].parentElement;
-                var rectangulo = rectanguloContainer.querySelector('.rectangulo-pulse');
-                if (rectangulo && !rectangulo.contains(event.target)) menus[i].style.display = 'none';
-            }}
-        }}
-    }});
-    </script>
+      <div class="page-wrap">
+        <h2 class="title">{titulo}</h2>
+        <div class="subtitle">{subtitulo}</div>
+        <div class="divider"></div>
+        {tabla_bloque}
+      </div>
     </body>
-    </html>
+    </html>"""
+
+
+# ════════════════════════════════════════════════════════════════════
+#  DETECCIÓN DE PÁGINA DE PARTICIPANTE (rueda hija)
+# ════════════════════════════════════════════════════════════════════
+query_params = st.query_params
+participante_seleccionado = query_params.get("participant", None)
+
+if participante_seleccionado:
+    st.set_page_config(page_title=f"Quiniela de {participante_seleccionado}", layout="wide")
+    st.markdown("""
+        <style>
+            .stApp { background-color: #0a0a0a; }
+            header, footer { display: none !important; }
+            .block-container { padding: 0 !important; max-width: 100% !important; }
+        </style>
+    """, unsafe_allow_html=True)
+
+    datos = obtener_datos_participante(participante_seleccionado)
+
+    hijo_team_flags    = {}
+    hijo_r16_flags     = {}
+    hijo_qf_flags      = {}
+    hijo_sf_flags      = {}
+    hijo_final_flags   = {}
+    hijo_champion_flags = {}
+
+    claves_r32  = set(mapeo_circulo_a_indice.values())
+    claves_r16  = set(r16_key_map.values())
+    claves_qf   = set(qf_key_map.values())
+    claves_sf   = set(sf_key_map.values())
+    claves_fin  = set(final_key_map.values())
+    claves_camp = set(champion_key_map.values())
+
+    for row in datos:
+        celda = (row.get("celda") or "").strip()
+        pais  = (row.get("pais") or "").strip()
+        if not celda or not pais:
+            continue
+        codigo = country_to_flag.get(pais)
+        if not codigo:
+            continue
+        archivo = f"{codigo}.svg"
+
+        if celda in claves_r32:
+            hijo_team_flags[celda] = archivo
+        elif celda in claves_r16:
+            hijo_r16_flags[celda] = (archivo, pais)
+        elif celda in claves_qf:
+            hijo_qf_flags[celda] = (archivo, pais)
+        elif celda in claves_sf:
+            hijo_sf_flags[celda] = (archivo, pais)
+        elif celda in claves_fin:
+            hijo_final_flags[celda] = (archivo, pais)
+        elif celda in claves_camp:
+            hijo_champion_flags[celda] = (archivo, pais)
+
+    st.markdown("""
+        <style>
+            div[data-testid="stRadio"] > label {
+                display: none;
+            }
+            div[data-testid="stRadio"] div[role="radiogroup"] {
+                display: flex;
+                justify-content: center;
+                gap: 2px;
+                background: linear-gradient(180deg, #1a1508, #110d04);
+                border: 1px solid #5a4520;
+                border-radius: 999px;
+                padding: 4px;
+                width: fit-content;
+                margin: 0 auto 4px auto;
+                box-shadow: inset 0 0 12px rgba(0,0,0,0.4);
+            }
+            div[data-testid="stRadio"] div[role="radiogroup"] label {
+                margin: 0 !important;
+                padding: 8px 22px !important;
+                border-radius: 999px !important;
+                color: #7a6535 !important;
+                font-family: monospace !important;
+                font-size: 11px !important;
+                letter-spacing: 1.5px;
+                text-transform: uppercase;
+                cursor: pointer;
+                border: 1px solid transparent;
+                transition: all .18s;
+            }
+            div[data-testid="stRadio"] div[role="radiogroup"] label:hover {
+                color: #d8cba8 !important;
+            }
+            div[data-testid="stRadio"] div[role="radiogroup"] label > div:first-child {
+                display: none !important;
+            }
+            div[data-testid="stRadio"] div[role="radiogroup"] label:has(input:checked) {
+                background: linear-gradient(180deg, #3a2d10, #221a08);
+                color: #f0d060 !important;
+                border: 1px solid #c8a84b;
+                box-shadow: 0 0 10px rgba(212,168,67,0.30);
+            }
+        </style>
+    """, unsafe_allow_html=True)
+
+    col_a, col_b, col_c = st.columns([1, 2, 1])
+    with col_b:
+        modo_vista = st.radio(
+            "Vista del bracket",
+            options=["Predicción completa", "Resultado en tiempo real"],
+            horizontal=True,
+            label_visibility="collapsed",
+        )
+
+    usar_solo_madre = (modo_vista == "Resultado en tiempo real")
+    titulo_bracket = (
+        f"TIEMPO REAL · {participante_seleccionado.upper()}"
+        if usar_solo_madre else
+        f"QUINIELA · {participante_seleccionado.upper()}"
+    )
+
+    bracket_html = construir_bracket_html(
+        team_flags=hijo_team_flags,
+        r16_flags=hijo_r16_flags,
+        qf_flags=hijo_qf_flags,
+        sf_flags=hijo_sf_flags,
+        final_flags=hijo_final_flags,
+        champion_flags=hijo_champion_flags,
+        titulo=titulo_bracket,
+        resultados_madre=resultados_madre_por_celda,
+        solo_madre=usar_solo_madre,
+    )
+
+    components.html(bracket_html, height=SVG_HEIGHT + 60, scrolling=False)
+
+    # ── TABLA "OCTAVOS" ──────────────────────────────────────────────
+    if datos:
+        datos_r16 = [
+            row for row in datos
+            if (row.get("celda", "") or "").strip() in claves_r16
+        ]
+        datos_r16_ordenados = sorted(datos_r16, key=lambda x: x["celda"])
+        filas_octavos = ""
+        total_aciertos_r16 = 0
+        total_con_resultado_r16 = 0
+        for i, row in enumerate(datos_r16_ordenados, start=1):
+            celda = row.get("celda", "")
+            pais = row.get("pais", "")
+
+            estado_html = ""
+            pais_madre = resultados_madre_por_celda.get(celda)
+            if pais_madre:
+                total_con_resultado_r16 += 1
+                if pais.strip() == pais_madre.strip():
+                    estado_html = '<span class="badge-ok">✓ Acierto</span>'
+                    total_aciertos_r16 += 1
+                else:
+                    estado_html = '<span class="badge-fail">✗ Falló</span>'
+                pais_html = f'{pais} <span class="madre-ref">(real: {pais_madre})</span>'
+            else:
+                pais_html = pais
+
+            filas_octavos += f"""
+            <tr class="quiniela-row">
+                <td class="col-num">{i}</td>
+                <td class="col-celda">{celda}</td>
+                <td class="col-pais">{pais_html}</td>
+                <td class="col-estado">{estado_html}</td>
+            </tr>
+            """
+        num_filas_r16 = len(datos_r16_ordenados)
+
+        footer_octavos = f"""
+        <tfoot>
+            <tr class="quiniela-footer">
+                <td colspan="3" class="footer-label">Total de aciertos</td>
+                <td class="footer-valor">{total_aciertos_r16}/{total_con_resultado_r16}</td>
+            </tr>
+        </tfoot>
+        """ if num_filas_r16 > 0 else ""
+
+        tabla_octavos = f"""
+        <table class="quiniela-table">
+            <thead>
+                <tr>
+                    <th>#</th><th>Celda</th><th>País</th><th>Estado</th>
+                </tr>
+            </thead>
+            <tbody>
+                {filas_octavos}
+            </tbody>
+            {footer_octavos}
+        </table>
+        """
+        altura_octavos = 280 + num_filas_r16 * 44
+    else:
+        tabla_octavos = '<div class="empty-state">No se encontraron datos para este participante.</div>'
+        altura_octavos = 260
+
+    octavos_html = construir_tabla_detalle_html(
+        titulo="QUIEN PASA A Octavos?",
+        subtitulo="Verde = acierto vs. resultado real &middot; Rojo = no coincide",
+        tabla_bloque=tabla_octavos,
+    )
+    st.components.v1.html(octavos_html, height=altura_octavos, scrolling=False)
+
+    # ── TABLA "GOLES DIECISEISAVOS" ───────────────────────────────────
+    def comparar_goles(goles_p, goles_r):
+        if goles_r is None or goles_r == "":
+            return '<span class="madre-ref">Pendiente</span>', False, False
+        try:
+            p_val = int(str(goles_p).strip())
+            r_val = int(str(goles_r).strip())
+        except (TypeError, ValueError):
+            return '<span class="madre-ref">—</span>', False, False
+        if p_val == r_val:
+            return '<span class="badge-ok">✓ Acierto!</span>', True, True
+        return '<span class="badge-fail">✗ Falló</span>', True, False
+
+    if datos:
+        datos_r32 = [
+            row for row in datos
+            if (row.get("celda", "") or "").strip() in claves_r32
+        ]
+        datos_r32_ordenados = sorted(datos_r32, key=lambda x: x["celda"])
+        filas_goles = ""
+        total_aciertos_goles = 0
+        total_con_resultado_goles = 0
+        for i, row in enumerate(datos_r32_ordenados, start=1):
+            celda = row.get("celda", "")
+            pais = row.get("pais", "")
+            goles_p = row.get("goles", "0")
+            goles_r = goles_madre_por_celda.get(celda)
+            goles_r_html = (
+                goles_r if goles_r is not None and goles_r != ""
+                else '<span class="madre-ref">—</span>'
+            )
+
+            comparacion_html, cuenta, acerto = comparar_goles(goles_p, goles_r)
+            if cuenta:
+                total_con_resultado_goles += 1
+                if acerto:
+                    total_aciertos_goles += 1
+
+            filas_goles += f"""
+            <tr class="quiniela-row">
+                <td class="col-num">{i}</td>
+                <td class="col-celda">{celda}</td>
+                <td class="col-pais">{pais}</td>
+                <td class="col-goles">{goles_p}</td>
+                <td class="col-goles-madre">{goles_r_html}</td>
+                <td class="col-comparacion">{comparacion_html}</td>
+            </tr>
+            """
+        num_filas_goles = len(datos_r32_ordenados)
+
+        footer_goles = f"""
+        <tfoot>
+            <tr class="quiniela-footer">
+                <td colspan="5" class="footer-label">Total de aciertos</td>
+                <td class="footer-valor">{total_aciertos_goles}/{total_con_resultado_goles}</td>
+            </tr>
+        </tfoot>
+        """ if num_filas_goles > 0 else ""
+
+        tabla_goles = f"""
+        <table class="quiniela-table">
+            <thead>
+                <tr>
+                    <th>#</th><th>Celda</th><th>País</th><th>Goles P</th><th>Goles R</th><th>Comparación</th>
+                </tr>
+            </thead>
+            <tbody>
+                {filas_goles}
+            </tbody>
+            {footer_goles}
+        </table>
+        """
+        altura_goles = 280 + num_filas_goles * 44
+    else:
+        tabla_goles = '<div class="empty-state">No se encontraron datos para este participante.</div>'
+        altura_goles = 260
+
+    goles_dieciseisavos_html = construir_tabla_detalle_html(
+        titulo="Goles Dieciseisavos",
+        subtitulo="Verde = goles exactos &middot; Rojo = no coincide",
+        tabla_bloque=tabla_goles,
+    )
+    st.components.v1.html(goles_dieciseisavos_html, height=altura_goles, scrolling=False)
+
+    # ── Botón de regreso ──────────────────────────────────────────────
+    col1, col2, col3 = st.columns([1, 1, 1])
+    with col2:
+        if st.button("← Volver al bracket", use_container_width=True):
+            st.query_params.clear()
+            st.rerun()
+
+    st.markdown("""
+        <style>
+            div[data-testid="stButton"] button {
+                background: linear-gradient(180deg, #1a1508, #110d04);
+                color: #d4a843;
+                border: 1px solid #5a4520;
+                border-radius: 8px;
+                font-family: monospace;
+                letter-spacing: 1px;
+                padding: 8px 16px;
+                transition: all 0.15s;
+            }
+            div[data-testid="stButton"] button:hover {
+                border-color: #c8a84b;
+                color: #f0d060;
+                background: linear-gradient(180deg, #221a08, #160f04);
+            }
+        </style>
+    """, unsafe_allow_html=True)
+
+    st.stop()
+
+
+# ════════════════════════════════════════════════════════════════════
+#  RUEDA MADRE (página principal)
+# ════════════════════════════════════════════════════════════════════
+st.set_page_config(page_title="Quiniela Fase 2 909", layout="wide", initial_sidebar_state="collapsed")
+
+st.markdown("""
+<style>
+    .stApp { background-color: #0a0a0a; }
+    .block-container { padding: 0 !important; max-width: 100% !important; }
+    header, footer { display: none !important; }
+</style>
+""", unsafe_allow_html=True)
+
+bracket_html = construir_bracket_html(
+    team_flags=herencia_fija,
+    r16_flags=madre_r16_flags,
+    qf_flags=madre_qf_flags,
+    sf_flags=madre_sf_flags,
+    final_flags=madre_final_flags,
+    champion_flags=madre_champion_flags,
+    titulo="COPA DEL MUNDO 2026",
+    goles_madre=goles_madre_por_celda,
+)
+
+components.html(bracket_html, height=SVG_HEIGHT + 60, scrolling=False)
+
+# ════════════════════════════════════════════════════════════════════
+#  TABLA DE PARTICIPANTES (con aciertos y ordenación)
+# ════════════════════════════════════════════════════════════════════
+participantes = obtener_participantes()
+
+if participantes:
+    todos_registros = obtener_todos_los_registros()
+    aciertos_por_participante = calcular_aciertos_por_participante(todos_registros)
+
+    participantes_ordenados = sorted(
+        participantes,
+        key=lambda n: (-aciertos_por_participante.get(n, 0), n)
+    )
+
+    filas_html = ""
+    for i, nombre in enumerate(participantes_ordenados, start=1):
+        url_participante = f"?participant={urllib.parse.quote(nombre)}"
+        total_aci = aciertos_por_participante.get(nombre, 0)
+        filas_html += f"""
+        <tr class="part-row" onclick="window.open('{url_participante}', '_blank')">
+            <td class="p-num">{i:02d}</td>
+            <td class="p-name">{nombre}</td>
+            <td class="p-aciertos">{total_aci}</td>
+            <td class="p-arrow">→</td>
+        </tr>
+        """
+    num_filas = len(participantes_ordenados)
+    tabla_bloque = f"""
+    <table class="part-table">
+        <thead>
+            <tr><th>#</th><th>Participante</th><th>Aciertos</th><th></th></tr>
+        </thead>
+        <tbody>
+            {filas_html}
+        </tbody>
+    </table>
     """
+    altura_tabla_section = 220 + num_filas * 46
+else:
+    tabla_bloque = '<div class="empty-state">No se encontraron participantes en la base de datos.</div>'
+    altura_tabla_section = 260
 
-    st.components.v1.html(html_completo, height=900, scrolling=True)
+participants_html = f"""<!DOCTYPE html>
+<html>
+<head>
+<style>
+  * {{ margin:0; padding:0; box-sizing:border-box; }}
+  body {{
+    background: #0a0a0a;
+    font-family: 'Georgia', serif;
+    display: flex;
+    justify-content: center;
+    padding: 30px 20px 50px 20px;
+  }}
+  .page-wrap {{
+    position: relative;
+    width: 100%;
+    max-width: 640px;
+  }}
+  .glow-bg {{
+    position: absolute;
+    top: -80px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 600px;
+    height: 600px;
+    background: radial-gradient(circle, rgba(212,168,67,0.14) 0%, rgba(138,96,32,0.05) 45%, rgba(10,10,10,0) 75%);
+    pointer-events: none;
+    z-index: 0;
+  }}
+  .content {{ position: relative; z-index: 1; }}
+  h2.title {{
+    text-align: center;
+    color: #d4a843;
+    font-family: 'Georgia', serif;
+    font-weight: normal;
+    letter-spacing: 5px;
+    font-size: 20px;
+    margin: 0 0 4px 0;
+    text-transform: uppercase;
+  }}
+  .subtitle {{
+    text-align: center;
+    color: #7a6535;
+    font-family: monospace;
+    font-size: 10px;
+    letter-spacing: 2px;
+    margin-bottom: 22px;
+    text-transform: uppercase;
+  }}
+  .divider {{
+    width: 100px;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, #c8a84b, transparent);
+    margin: 0 auto 26px auto;
+  }}
+  .part-table {{
+    width: 100%;
+    border-collapse: collapse;
+    background: rgba(20, 15, 5, 0.5);
+    border: 1px solid #3a2e10;
+    border-radius: 10px;
+    overflow: hidden;
+  }}
+  .part-table thead th {{
+    background: linear-gradient(180deg, #1a1508, #110d04);
+    color: #e8d080;
+    font-family: monospace;
+    font-size: 11px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    padding: 12px 16px;
+    border-bottom: 1px solid #c8a84b;
+    text-align: left;
+    font-weight: normal;
+  }}
+  .part-row {{
+    cursor: pointer;
+    transition: background 0.15s;
+  }}
+  .part-row td {{
+    padding: 12px 16px;
+    color: #d8cba8;
+    font-family: monospace;
+    font-size: 13px;
+    border-bottom: 1px solid #221a0a;
+  }}
+  .part-row:hover td {{
+    background: rgba(200, 168, 75, 0.08);
+    color: #f0d060;
+  }}
+  .part-row:last-child td {{ border-bottom: none; }}
+  .p-num {{ color: #7a6535; width: 8%; }}
+  .p-name {{ width: 56%; }}
+  .p-aciertos {{
+    width: 16%;
+    text-align: center;
+    color: #c8a84b;
+    font-weight: bold;
+  }}
+  .p-arrow {{
+    width: 10%;
+    text-align: right;
+    color: #5a4520;
+    transition: color 0.15s, transform 0.15s;
+  }}
+  .part-row:hover .p-arrow {{
+    color: #d4a843;
+    transform: translateX(3px);
+  }}
+  .empty-state {{
+    text-align: center;
+    color: #7a6535;
+    font-family: monospace;
+    font-size: 13px;
+    padding: 50px 20px;
+    border: 1px dashed #3a2e10;
+    border-radius: 10px;
+  }}
+</style>
+</head>
+<body>
+  <div class="page-wrap">
+    <div class="glow-bg"></div>
+    <div class="content">
+      <h2 class="title">Participantes</h2>
+      <div class="subtitle">Quiniela &middot; World Cup</div>
+      <div class="divider"></div>
+      {tabla_bloque}
+    </div>
+  </div>
+</body>
+</html>"""
 
-if __name__ == "__main__":
-    main()
+st.components.v1.html(participants_html, height=altura_tabla_section, scrolling=False)
