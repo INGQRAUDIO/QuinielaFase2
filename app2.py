@@ -222,7 +222,8 @@ madre_r16_flags = {
     "A11": ("ca.svg", "Canadá"),
     "A12": ("ma.svg", "Marruecos"),
     "A9": ("py.svg", "Paraguay"),
-    "B10": ("no.svg", "Noruega")
+    "B10": ("no.svg", "Noruega"),
+    "A13": ("fr.svg", "Francia"),
 }
 madre_qf_flags = {}
 madre_sf_flags = {}
@@ -236,6 +237,7 @@ goles_madre_r32 = {
     "A1": 4, "A5": 5,
     "A4": 3, "A8": 4,
     "B6": 1, "B2": 2,
+    "A2": 3, "A6": 0,
 }
 goles_madre_r16 = {}
 goles_madre_qf = {}
