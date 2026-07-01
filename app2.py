@@ -225,6 +225,8 @@ madre_r16_flags = {
     "B10": ("no.svg", "Noruega"),
     "A10": ("fr.svg", "Francia"),
     "B11": ("mx.svg", "México"),
+    "B12": ("gb-eng.svg", "Inglaterra"),
+    "C12": ("b.svg", "Bélgica")
 }
 madre_qf_flags = {}
 madre_sf_flags = {}
@@ -240,6 +242,8 @@ goles_madre_r32 = {
     "B6": 1, "B2": 2,
     "A2": 3, "A6": 0,
     "B7": 2, "B3": 0,
+    "B8": 2, "B4": 1,
+    "C4": 3, "C8": 2
 }
 goles_madre_r16 = {}
 goles_madre_qf = {}
@@ -768,7 +772,7 @@ wireTooltip('.champion-node', championNames, true);
 # ════════════════════════════════════════════════════════════════════
 #  FUNCIÓN REUTILIZABLE: tabla de resultados con el diseño estándar
 # ════════════════════════════════════════════════════════════════════
-def construir_tabla_detalle_html(titulo, subtitulo, tabla_bloque, ancho_tabla=460):
+def construir_tabla_detalle_html(titulo, subtitulo, tabla_bloque):
     return f"""<!DOCTYPE html>
     <html>
     <head>
@@ -819,9 +823,8 @@ def construir_tabla_detalle_html(titulo, subtitulo, tabla_bloque, ancho_tabla=46
         border-radius: 10px;
       }}
       .quiniela-table {{
-        width: {ancho_tabla}px;   /* ancho fijo: la tabla se ajusta al contenido en vez de estirarse */
-        table-layout: fixed;
-        margin: 0 auto;
+        width: 100%;
+        min-width: 560px;   /* evita que las columnas se compriman y las filas se envuelvan en móvil */
         border-collapse: collapse;
         background: rgba(20, 15, 5, 0.5);
         border: 1px solid #3a2e10;
@@ -856,13 +859,13 @@ def construir_tabla_detalle_html(titulo, subtitulo, tabla_bloque, ancho_tabla=46
         color: #f0d060;
       }}
       .quiniela-row:last-child td {{ border-bottom: none; }}
-      .col-num {{ color: #7a6535; width: 40px; }}
-      .col-celda {{ width: 60px; }}
-      .col-pais {{ width: 230px; text-align: left !important; padding-left: 18px !important; }}
-      .col-goles {{ color: #c8a84b; font-weight: bold; width: 80px; }}
-      .col-goles-madre {{ color: #e8d080; width: 90px; }}
-      .col-estado {{ width: 130px; }}
-      .col-comparacion {{ width: 160px; }}
+      .col-num {{ color: #7a6535; width: 6%; }}
+      .col-celda {{ width: 10%; }}
+      .col-pais {{ width: 32%; text-align: left !important; padding-left: 18px !important; }}
+      .col-goles {{ color: #c8a84b; font-weight: bold; width: 12%; }}
+      .col-goles-madre {{ color: #e8d080; width: 14%; }}
+      .col-estado {{ width: 16%; }}
+      .col-comparacion {{ width: 20%; }}
       .madre-ref {{ color: #6a5528; font-size: 11px; }}
       .badge-ok {{
         color: #3ddc6e;
@@ -1133,7 +1136,6 @@ if participante_seleccionado:
         titulo="QUIEN PASA A Octavos?",
         subtitulo="Verde = acierto vs. resultado real &middot; Rojo = no coincide",
         tabla_bloque=tabla_octavos,
-        ancho_tabla=460,
     )
     st.components.v1.html(octavos_html, height=altura_octavos, scrolling=False)
 
@@ -1218,7 +1220,6 @@ if participante_seleccionado:
         titulo="Goles Dieciseisavos",
         subtitulo="Verde = goles exactos &middot; Rojo = no coincide",
         tabla_bloque=tabla_goles,
-        ancho_tabla=660,
     )
     st.components.v1.html(goles_dieciseisavos_html, height=altura_goles, scrolling=False)
 
@@ -1382,9 +1383,8 @@ participants_html = f"""<!DOCTYPE html>
     border-radius: 10px;
   }}
   .part-table {{
-    width: 420px;   /* ancho fijo: la tabla se ajusta al contenido en vez de estirarse */
-    table-layout: fixed;
-    margin: 0 auto;
+    width: 100%;
+    min-width: 500px;   /* ancho mínimo para forzar scroll si el viewport es menor */
     border-collapse: collapse;
     background: rgba(20, 15, 5, 0.5);
     border: 1px solid #3a2e10;
@@ -1421,16 +1421,16 @@ participants_html = f"""<!DOCTYPE html>
     color: #f0d060;
   }}
   .part-row:last-child td {{ border-bottom: none; }}
-  .p-num {{ color: #7a6535; width: 40px; }}
-  .p-name {{ width: 210px; }}
+  .p-num {{ color: #7a6535; width: 8%; }}
+  .p-name {{ width: 56%; }}
   .p-aciertos {{
-    width: 100px;
+    width: 16%;
     text-align: center;
     color: #c8a84b;
     font-weight: bold;
   }}
   .p-arrow {{
-    width: 70px;
+    width: 10%;
     text-align: right;
     color: #5a4520;
     transition: color 0.15s, transform 0.15s;
