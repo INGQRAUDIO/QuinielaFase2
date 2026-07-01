@@ -1009,6 +1009,8 @@ if participante_seleccionado:
         </style>
     """, unsafe_allow_html=True)
 
+
+
     col_a, col_b, col_c = st.columns([1, 2, 1])
     with col_b:
         modo_vista = st.radio(
