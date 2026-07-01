@@ -681,6 +681,7 @@ def construir_bracket_html(
     html = f"""<!DOCTYPE html>
 <html>
 <head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <style>
   * {{ margin:0; padding:0; box-sizing:border-box; }}
   body {{
@@ -769,6 +770,7 @@ def construir_tabla_detalle_html(titulo, subtitulo, tabla_bloque):
     return f"""<!DOCTYPE html>
     <html>
     <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
     <style>
       * {{ margin:0; padding:0; box-sizing:border-box; }}
       body {{
@@ -808,6 +810,17 @@ def construir_tabla_detalle_html(titulo, subtitulo, tabla_bloque):
         background: linear-gradient(90deg, transparent, #c8a84b, transparent);
         margin: 0 auto 26px auto;
       }}
+      /* ── ACCIÓN 1 (móvil): contenedor con scroll horizontal ──────────
+         En pantallas angostas, en vez de forzar que las columnas se
+         encimen o el texto se corte, dejamos que la tabla conserve su
+         ancho natural y el usuario pueda deslizar hacia los lados. Esto
+         evita que el alto calculado en Python (altura_octavos, etc.)
+         quede corto por texto que se hubiera partido en más líneas. */
+      .table-scroll {{
+        width: 100%;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+      }}
       .quiniela-table {{
         width: 100%;
         border-collapse: collapse;
@@ -827,6 +840,7 @@ def construir_tabla_detalle_html(titulo, subtitulo, tabla_bloque):
         border-bottom: 1px solid #c8a84b;
         text-align: center;
         font-weight: normal;
+        white-space: nowrap;
       }}
       .quiniela-row td {{
         padding: 11px 10px;
@@ -836,6 +850,7 @@ def construir_tabla_detalle_html(titulo, subtitulo, tabla_bloque):
         font-size: 13px;
         border-bottom: 1px solid #221a0a;
         transition: background 0.15s;
+        white-space: nowrap;
       }}
       .quiniela-row:hover td {{
         background: rgba(200, 168, 75, 0.08);
@@ -857,6 +872,7 @@ def construir_tabla_detalle_html(titulo, subtitulo, tabla_bloque):
         border-radius: 6px;
         padding: 2px 8px;
         font-size: 11px;
+        white-space: nowrap;
       }}
       .badge-fail {{
         color: #e0473e;
@@ -865,6 +881,7 @@ def construir_tabla_detalle_html(titulo, subtitulo, tabla_bloque):
         border-radius: 6px;
         padding: 2px 8px;
         font-size: 11px;
+        white-space: nowrap;
       }}
       .quiniela-footer td {{
         padding: 12px 10px;
@@ -878,6 +895,7 @@ def construir_tabla_detalle_html(titulo, subtitulo, tabla_bloque):
         font-size: 11px;
         letter-spacing: 1.5px;
         text-transform: uppercase;
+        white-space: nowrap;
       }}
       .footer-valor {{
         text-align: center;
@@ -894,6 +912,24 @@ def construir_tabla_detalle_html(titulo, subtitulo, tabla_bloque):
         border: 1px dashed #3a2e10;
         border-radius: 10px;
       }}
+
+      /* ── ACCIÓN 1 (móvil): SOLO afecta pantallas angostas ──────────
+         Reduce paddings y tipografía para que quepan más columnas
+         antes de necesitar el scroll horizontal. En pantallas de
+         escritorio (arriba de 640px) nada de este bloque aplica, así
+         que el diseño original permanece intacto. */
+      @media (max-width: 640px) {{
+        body {{ padding: 10px 8px 40px 8px; }}
+        h2.title {{ font-size: 15px; letter-spacing: 2.5px; }}
+        .subtitle {{ font-size: 9px; }}
+        .quiniela-table thead th {{ font-size: 10px; padding: 10px 8px; }}
+        .quiniela-row td {{ font-size: 12px; padding: 9px 8px; }}
+        .col-pais {{ padding-left: 10px !important; }}
+        .madre-ref {{ font-size: 10px; }}
+        .badge-ok, .badge-fail {{ font-size: 10px; padding: 2px 6px; }}
+        .footer-label {{ font-size: 10px; }}
+        .footer-valor {{ font-size: 13px; }}
+      }}
     </style>
     </head>
     <body>
@@ -901,7 +937,9 @@ def construir_tabla_detalle_html(titulo, subtitulo, tabla_bloque):
         <h2 class="title">{titulo}</h2>
         <div class="subtitle">{subtitulo}</div>
         <div class="divider"></div>
-        {tabla_bloque}
+        <div class="table-scroll">
+          {tabla_bloque}
+        </div>
       </div>
     </body>
     </html>"""
@@ -962,10 +1000,44 @@ if participante_seleccionado:
         elif celda in claves_camp:
             hijo_champion_flags[celda] = (archivo, pais)
 
+    # ── ACCIÓN 2: encabezado "QUINIELA · NOMBRE" como primer elemento ──
+    # Este es el título fijo de la página del participante. Va primero
+    # en el orden visual, y los botones de vista (Predicción completa /
+    # Resultado en tiempo real) se muestran justo debajo.
+    st.markdown(f"""
+        <style>
+            .quiniela-page-header {{
+                text-align: center;
+                color: #d4a843;
+                font-family: 'Georgia', serif;
+                font-weight: normal;
+                letter-spacing: 4px;
+                font-size: 22px;
+                text-transform: uppercase;
+                margin: 28px 0 14px 0;
+            }}
+        </style>
+        <h1 class="quiniela-page-header">QUINIELA &middot; {participante_seleccionado.upper()}</h1>
+    """, unsafe_allow_html=True)
+
     st.markdown("""
         <style>
             div[data-testid="stRadio"] > label {
                 display: none;
+            }
+            /* ── ACCIÓN 2: centrado robusto en PC y móvil ─────────────
+               Antes solo el contenedor interno (radiogroup) tenía
+               margin:auto, lo que no garantizaba el centrado si el
+               contenedor padre de Streamlit usaba flex con alineación
+               a la izquierda en pantallas anchas. Forzamos aquí que el
+               propio div[data-testid="stRadio"] sea un flex-container
+               centrado, así el grupo de botones queda centrado sin
+               importar el ancho de pantalla. */
+            div[data-testid="stRadio"] {
+                display: flex !important;
+                flex-direction: column !important;
+                align-items: center !important;
+                width: 100% !important;
             }
             div[data-testid="stRadio"] div[role="radiogroup"] {
                 display: flex;
@@ -1293,6 +1365,7 @@ else:
 participants_html = f"""<!DOCTYPE html>
 <html>
 <head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <style>
   * {{ margin:0; padding:0; box-sizing:border-box; }}
   body {{
@@ -1344,6 +1417,12 @@ participants_html = f"""<!DOCTYPE html>
     background: linear-gradient(90deg, transparent, #c8a84b, transparent);
     margin: 0 auto 26px auto;
   }}
+  /* ── ACCIÓN 1 (móvil): contenedor con scroll horizontal ────────── */
+  .table-scroll {{
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }}
   .part-table {{
     width: 100%;
     border-collapse: collapse;
@@ -1363,6 +1442,7 @@ participants_html = f"""<!DOCTYPE html>
     border-bottom: 1px solid #c8a84b;
     text-align: left;
     font-weight: normal;
+    white-space: nowrap;
   }}
   .part-row {{
     cursor: pointer;
@@ -1374,6 +1454,7 @@ participants_html = f"""<!DOCTYPE html>
     font-family: monospace;
     font-size: 13px;
     border-bottom: 1px solid #221a0a;
+    white-space: nowrap;
   }}
   .part-row:hover td {{
     background: rgba(200, 168, 75, 0.08);
@@ -1407,6 +1488,15 @@ participants_html = f"""<!DOCTYPE html>
     border: 1px dashed #3a2e10;
     border-radius: 10px;
   }}
+
+  /* ── ACCIÓN 1 (móvil): SOLO afecta pantallas angostas ───────────── */
+  @media (max-width: 640px) {{
+    body {{ padding: 20px 8px 40px 8px; }}
+    h2.title {{ font-size: 16px; letter-spacing: 3px; }}
+    .subtitle {{ font-size: 9px; }}
+    .part-table thead th {{ font-size: 10px; padding: 10px 10px; }}
+    .part-row td {{ font-size: 12px; padding: 10px 10px; }}
+  }}
 </style>
 </head>
 <body>
@@ -1416,7 +1506,9 @@ participants_html = f"""<!DOCTYPE html>
       <h2 class="title">Participantes</h2>
       <div class="subtitle">Quiniela &middot; World Cup</div>
       <div class="divider"></div>
-      {tabla_bloque}
+      <div class="table-scroll">
+        {tabla_bloque}
+      </div>
     </div>
   </div>
 </body>
