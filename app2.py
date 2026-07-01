@@ -683,6 +683,7 @@ def construir_bracket_html(
     html = f"""<!DOCTYPE html>
 <html>
 <head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <style>
   * {{ margin:0; padding:0; box-sizing:border-box; }}
   body {{
@@ -771,6 +772,7 @@ def construir_tabla_detalle_html(titulo, subtitulo, tabla_bloque):
     return f"""<!DOCTYPE html>
     <html>
     <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
     <style>
       * {{ margin:0; padding:0; box-sizing:border-box; }}
       body {{
@@ -1297,6 +1299,7 @@ else:
 participants_html = f"""<!DOCTYPE html>
 <html>
 <head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <style>
   * {{ margin:0; padding:0; box-sizing:border-box; }}
   body {{
@@ -1348,8 +1351,15 @@ participants_html = f"""<!DOCTYPE html>
     background: linear-gradient(90deg, transparent, #c8a84b, transparent);
     margin: 0 auto 26px auto;
   }}
+  .table-scroll {{
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    width: 100%;
+    border-radius: 10px;
+  }}
   .part-table {{
     width: 100%;
+    min-width: 500px;   /* ancho mínimo para forzar scroll si el viewport es menor */
     border-collapse: collapse;
     background: rgba(20, 15, 5, 0.5);
     border: 1px solid #3a2e10;
@@ -1367,6 +1377,7 @@ participants_html = f"""<!DOCTYPE html>
     border-bottom: 1px solid #c8a84b;
     text-align: left;
     font-weight: normal;
+    white-space: nowrap;
   }}
   .part-row {{
     cursor: pointer;
@@ -1378,6 +1389,7 @@ participants_html = f"""<!DOCTYPE html>
     font-family: monospace;
     font-size: 13px;
     border-bottom: 1px solid #221a0a;
+    white-space: nowrap;
   }}
   .part-row:hover td {{
     background: rgba(200, 168, 75, 0.08);
@@ -1411,6 +1423,14 @@ participants_html = f"""<!DOCTYPE html>
     border: 1px dashed #3a2e10;
     border-radius: 10px;
   }}
+  /* ============ SOLO PARA MÓVILES (≤640px) ============ */
+  @media (max-width: 640px) {{
+    body {{ padding: 15px 5px 30px 5px; }}
+    h2.title {{ font-size: 16px; letter-spacing: 3px; }}
+    .subtitle {{ font-size: 9px; }}
+    .part-table thead th {{ font-size: 9px; padding: 8px 6px; }}
+    .part-row td {{ font-size: 11px; padding: 8px 6px; }}
+  }}
 </style>
 </head>
 <body>
@@ -1420,7 +1440,9 @@ participants_html = f"""<!DOCTYPE html>
       <h2 class="title">Participantes</h2>
       <div class="subtitle">Quiniela &middot; World Cup</div>
       <div class="divider"></div>
-      {tabla_bloque}
+      <div class="table-scroll">
+        {tabla_bloque}
+      </div>
     </div>
   </div>
 </body>
