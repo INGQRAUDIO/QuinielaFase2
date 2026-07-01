@@ -224,7 +224,6 @@ madre_r16_flags = {
     "A9": ("py.svg", "Paraguay"),
     "B10": ("no.svg", "Noruega"),
     "A10": ("fr.svg", "Francia"),
-    "B11": ("mx.svg", "México"),
 }
 madre_qf_flags = {}
 madre_sf_flags = {}
@@ -239,7 +238,6 @@ goles_madre_r32 = {
     "A4": 3, "A8": 4,
     "B6": 1, "B2": 2,
     "A2": 3, "A6": 0,
-    "B7": 2, "B3": 0,
 }
 goles_madre_r16 = {}
 goles_madre_qf = {}
@@ -683,7 +681,6 @@ def construir_bracket_html(
     html = f"""<!DOCTYPE html>
 <html>
 <head>
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <style>
   * {{ margin:0; padding:0; box-sizing:border-box; }}
   body {{
@@ -772,7 +769,6 @@ def construir_tabla_detalle_html(titulo, subtitulo, tabla_bloque):
     return f"""<!DOCTYPE html>
     <html>
     <head>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
     <style>
       * {{ margin:0; padding:0; box-sizing:border-box; }}
       body {{
@@ -812,17 +808,6 @@ def construir_tabla_detalle_html(titulo, subtitulo, tabla_bloque):
         background: linear-gradient(90deg, transparent, #c8a84b, transparent);
         margin: 0 auto 26px auto;
       }}
-      /* ── ACCIÓN 1 (móvil): contenedor con scroll horizontal ──────────
-         En pantallas angostas, en vez de forzar que las columnas se
-         encimen o el texto se corte, dejamos que la tabla conserve su
-         ancho natural y el usuario pueda deslizar hacia los lados. Esto
-         evita que el alto calculado en Python (altura_octavos, etc.)
-         quede corto por texto que se hubiera partido en más líneas. */
-      .table-scroll {{
-        width: 100%;
-        overflow-x: auto;
-        -webkit-overflow-scrolling: touch;
-      }}
       .quiniela-table {{
         width: 100%;
         border-collapse: collapse;
@@ -842,7 +827,6 @@ def construir_tabla_detalle_html(titulo, subtitulo, tabla_bloque):
         border-bottom: 1px solid #c8a84b;
         text-align: center;
         font-weight: normal;
-        white-space: nowrap;
       }}
       .quiniela-row td {{
         padding: 11px 10px;
@@ -852,7 +836,6 @@ def construir_tabla_detalle_html(titulo, subtitulo, tabla_bloque):
         font-size: 13px;
         border-bottom: 1px solid #221a0a;
         transition: background 0.15s;
-        white-space: nowrap;
       }}
       .quiniela-row:hover td {{
         background: rgba(200, 168, 75, 0.08);
@@ -874,7 +857,6 @@ def construir_tabla_detalle_html(titulo, subtitulo, tabla_bloque):
         border-radius: 6px;
         padding: 2px 8px;
         font-size: 11px;
-        white-space: nowrap;
       }}
       .badge-fail {{
         color: #e0473e;
@@ -883,7 +865,6 @@ def construir_tabla_detalle_html(titulo, subtitulo, tabla_bloque):
         border-radius: 6px;
         padding: 2px 8px;
         font-size: 11px;
-        white-space: nowrap;
       }}
       .quiniela-footer td {{
         padding: 12px 10px;
@@ -897,7 +878,6 @@ def construir_tabla_detalle_html(titulo, subtitulo, tabla_bloque):
         font-size: 11px;
         letter-spacing: 1.5px;
         text-transform: uppercase;
-        white-space: nowrap;
       }}
       .footer-valor {{
         text-align: center;
@@ -914,24 +894,6 @@ def construir_tabla_detalle_html(titulo, subtitulo, tabla_bloque):
         border: 1px dashed #3a2e10;
         border-radius: 10px;
       }}
-
-      /* ── ACCIÓN 1 (móvil): SOLO afecta pantallas angostas ──────────
-         Reduce paddings y tipografía para que quepan más columnas
-         antes de necesitar el scroll horizontal. En pantallas de
-         escritorio (arriba de 640px) nada de este bloque aplica, así
-         que el diseño original permanece intacto. */
-      @media (max-width: 640px) {{
-        body {{ padding: 10px 8px 40px 8px; }}
-        h2.title {{ font-size: 15px; letter-spacing: 2.5px; }}
-        .subtitle {{ font-size: 9px; }}
-        .quiniela-table thead th {{ font-size: 10px; padding: 10px 8px; }}
-        .quiniela-row td {{ font-size: 12px; padding: 9px 8px; }}
-        .col-pais {{ padding-left: 10px !important; }}
-        .madre-ref {{ font-size: 10px; }}
-        .badge-ok, .badge-fail {{ font-size: 10px; padding: 2px 6px; }}
-        .footer-label {{ font-size: 10px; }}
-        .footer-valor {{ font-size: 13px; }}
-      }}
     </style>
     </head>
     <body>
@@ -939,9 +901,7 @@ def construir_tabla_detalle_html(titulo, subtitulo, tabla_bloque):
         <h2 class="title">{titulo}</h2>
         <div class="subtitle">{subtitulo}</div>
         <div class="divider"></div>
-        <div class="table-scroll">
-          {tabla_bloque}
-        </div>
+        {tabla_bloque}
       </div>
     </body>
     </html>"""
@@ -1002,52 +962,10 @@ if participante_seleccionado:
         elif celda in claves_camp:
             hijo_champion_flags[celda] = (archivo, pais)
 
-    # ── Encabezado dorado "QUINIELA · NOMBRE" (el título original) ─────
-    # Este texto ya existía DENTRO de la rueda SVG (con estilo dorado,
-    # serif, mayúsculas). Se saca de ahí y se sube como el primer
-    # elemento de la página, para que quede arriba de los botones de
-    # vista. Es dinámico: cambia a "TIEMPO REAL · NOMBRE" si el
-    # participante tiene seleccionada esa vista — igual que hacía antes
-    # dentro de la rueda. Usamos una key de session_state para poder
-    # leer la vista seleccionada ANTES de dibujar el radio de abajo.
-    _key_modo_vista = "modo_vista_radio"
-    _modo_vista_actual = st.session_state.get(_key_modo_vista, "Predicción completa")
-    _titulo_header = (
-        f"TIEMPO REAL · {participante_seleccionado.upper()}"
-        if _modo_vista_actual == "Resultado en tiempo real" else
-        f"QUINIELA · {participante_seleccionado.upper()}"
-    )
-    st.markdown(f"""
-        <style>
-            .quiniela-page-header {{
-                text-align: center;
-                color: #c8a84b;
-                font-family: 'Georgia', serif;
-                font-weight: normal;
-                letter-spacing: 5px;
-                font-size: 24px;
-                text-transform: uppercase;
-                margin: 30px 0 18px 0;
-            }}
-        </style>
-        <h1 class="quiniela-page-header">{_titulo_header}</h1>
-    """, unsafe_allow_html=True)
-
     st.markdown("""
         <style>
             div[data-testid="stRadio"] > label {
                 display: none;
-            }
-            /* ── Centrado robusto en PC y móvil ───────────────────────
-               Se centra el propio widget (sin depender de st.columns,
-               que no garantizaba quedar centrado en pantallas anchas)
-               usando flex directamente sobre stRadio. */
-            div[data-testid="stRadio"] {
-                display: flex !important;
-                flex-direction: column !important;
-                align-items: center !important;
-                justify-content: center !important;
-                width: 100% !important;
             }
             div[data-testid="stRadio"] div[role="radiogroup"] {
                 display: flex;
@@ -1089,16 +1007,21 @@ if participante_seleccionado:
         </style>
     """, unsafe_allow_html=True)
 
-    modo_vista = st.radio(
-        "Vista del bracket",
-        options=["Predicción completa", "Resultado en tiempo real"],
-        horizontal=True,
-        label_visibility="collapsed",
-        key=_key_modo_vista,
-    )
+    col_a, col_b, col_c = st.columns([1, 2, 1])
+    with col_b:
+        modo_vista = st.radio(
+            "Vista del bracket",
+            options=["Predicción completa", "Resultado en tiempo real"],
+            horizontal=True,
+            label_visibility="collapsed",
+        )
 
     usar_solo_madre = (modo_vista == "Resultado en tiempo real")
-    titulo_bracket = ""  # El título ya se muestra arriba como encabezado HTML; no se repite dentro de la rueda.
+    titulo_bracket = (
+        f"TIEMPO REAL · {participante_seleccionado.upper()}"
+        if usar_solo_madre else
+        f"QUINIELA · {participante_seleccionado.upper()}"
+    )
 
     bracket_html = construir_bracket_html(
         team_flags=hijo_team_flags,
@@ -1370,7 +1293,6 @@ else:
 participants_html = f"""<!DOCTYPE html>
 <html>
 <head>
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <style>
   * {{ margin:0; padding:0; box-sizing:border-box; }}
   body {{
@@ -1422,12 +1344,6 @@ participants_html = f"""<!DOCTYPE html>
     background: linear-gradient(90deg, transparent, #c8a84b, transparent);
     margin: 0 auto 26px auto;
   }}
-  /* ── ACCIÓN 1 (móvil): contenedor con scroll horizontal ────────── */
-  .table-scroll {{
-    width: 100%;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-  }}
   .part-table {{
     width: 100%;
     border-collapse: collapse;
@@ -1447,7 +1363,6 @@ participants_html = f"""<!DOCTYPE html>
     border-bottom: 1px solid #c8a84b;
     text-align: left;
     font-weight: normal;
-    white-space: nowrap;
   }}
   .part-row {{
     cursor: pointer;
@@ -1459,7 +1374,6 @@ participants_html = f"""<!DOCTYPE html>
     font-family: monospace;
     font-size: 13px;
     border-bottom: 1px solid #221a0a;
-    white-space: nowrap;
   }}
   .part-row:hover td {{
     background: rgba(200, 168, 75, 0.08);
@@ -1493,15 +1407,6 @@ participants_html = f"""<!DOCTYPE html>
     border: 1px dashed #3a2e10;
     border-radius: 10px;
   }}
-
-  /* ── ACCIÓN 1 (móvil): SOLO afecta pantallas angostas ───────────── */
-  @media (max-width: 640px) {{
-    body {{ padding: 20px 8px 40px 8px; }}
-    h2.title {{ font-size: 16px; letter-spacing: 3px; }}
-    .subtitle {{ font-size: 9px; }}
-    .part-table thead th {{ font-size: 10px; padding: 10px 10px; }}
-    .part-row td {{ font-size: 12px; padding: 10px 10px; }}
-  }}
 </style>
 </head>
 <body>
@@ -1511,9 +1416,7 @@ participants_html = f"""<!DOCTYPE html>
       <h2 class="title">Participantes</h2>
       <div class="subtitle">Quiniela &middot; World Cup</div>
       <div class="divider"></div>
-      <div class="table-scroll">
-        {tabla_bloque}
-      </div>
+      {tabla_bloque}
     </div>
   </div>
 </body>
