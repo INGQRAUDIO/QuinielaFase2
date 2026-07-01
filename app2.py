@@ -1386,7 +1386,7 @@ participants_html = f"""<!DOCTYPE html>
     border-radius: 10px;
   }}
   .part-table {{
-    width: 420px;   /* ancho fijo: la tabla se ajusta al contenido en vez de estirarse */
+    width: 500px;   /* ancho fijo: la tabla se ajusta al contenido en vez de estirarse */
     table-layout: fixed;
     margin: 0 auto;
     border-collapse: collapse;
