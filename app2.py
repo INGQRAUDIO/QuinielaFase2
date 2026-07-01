@@ -772,7 +772,7 @@ wireTooltip('.champion-node', championNames, true);
 # ════════════════════════════════════════════════════════════════════
 #  FUNCIÓN REUTILIZABLE: tabla de resultados con el diseño estándar
 # ════════════════════════════════════════════════════════════════════
-def construir_tabla_detalle_html(titulo, subtitulo, tabla_bloque, ancho_tabla=460):
+def construir_tabla_detalle_html(titulo, subtitulo, tabla_bloque):
     return f"""<!DOCTYPE html>
     <html>
     <head>
@@ -823,8 +823,7 @@ def construir_tabla_detalle_html(titulo, subtitulo, tabla_bloque, ancho_tabla=46
         border-radius: 10px;
       }}
       .quiniela-table {{
-        width: {ancho_tabla}px;   /* ancho fijo: la tabla se ajusta al contenido en vez de estirarse */
-        table-layout: fixed;
+        table-layout: fixed;   /* el ancho total = suma de los anchos de columna de abajo, nada más que ajustar aquí */
         margin: 0 auto;
         border-collapse: collapse;
         background: rgba(20, 15, 5, 0.5);
@@ -1137,7 +1136,6 @@ if participante_seleccionado:
         titulo="QUIEN PASA A Octavos?",
         subtitulo="Verde = acierto vs. resultado real &middot; Rojo = no coincide",
         tabla_bloque=tabla_octavos,
-        ancho_tabla=460,
     )
     st.components.v1.html(octavos_html, height=altura_octavos, scrolling=False)
 
@@ -1222,7 +1220,6 @@ if participante_seleccionado:
         titulo="Goles Dieciseisavos",
         subtitulo="Verde = goles exactos &middot; Rojo = no coincide",
         tabla_bloque=tabla_goles,
-        ancho_tabla=660,
     )
     st.components.v1.html(goles_dieciseisavos_html, height=altura_goles, scrolling=False)
 
@@ -1386,8 +1383,7 @@ participants_html = f"""<!DOCTYPE html>
     border-radius: 10px;
   }}
   .part-table {{
-    width: 500px;   /* ancho fijo: la tabla se ajusta al contenido en vez de estirarse */
-    table-layout: fixed;
+    table-layout: fixed;   /* el ancho total = suma de los anchos de columna de abajo, nada más que ajustar aquí */
     margin: 0 auto;
     border-collapse: collapse;
     background: rgba(20, 15, 5, 0.5);
