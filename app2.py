@@ -224,7 +224,7 @@ madre_r16_flags = {
     "A9": ("py.svg", "Paraguay"),
     "B10": ("no.svg", "Noruega"),
     "A10": ("fr.svg", "Francia"),
-    "b11": ("mx.svg", "México"),
+    "B11": ("mx.svg", "México"),
 }
 madre_qf_flags = {}
 madre_sf_flags = {}
