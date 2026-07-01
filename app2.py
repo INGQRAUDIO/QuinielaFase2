@@ -224,7 +224,7 @@ madre_r16_flags = {
     "A9": ("py.svg", "Paraguay"),
     "B10": ("no.svg", "Noruega"),
     "A10": ("fr.svg", "Francia"),
-    "B11": ("mx.svg", "México"),
+    "b11": ("mx.svg", "México"),
 }
 madre_qf_flags = {}
 madre_sf_flags = {}
@@ -239,7 +239,7 @@ goles_madre_r32 = {
     "A4": 3, "A8": 4,
     "B6": 1, "B2": 2,
     "A2": 3, "A6": 0,
-    "B7": 2, "B3": 1,
+    "B7": 2, "B3": 0,
 }
 goles_madre_r16 = {}
 goles_madre_qf = {}
@@ -1002,24 +1002,35 @@ if participante_seleccionado:
         elif celda in claves_camp:
             hijo_champion_flags[celda] = (archivo, pais)
 
-    # ── ACCIÓN 2: encabezado "QUINIELA · NOMBRE" como primer elemento ──
-    # Este es el título fijo de la página del participante. Va primero
-    # en el orden visual, y los botones de vista (Predicción completa /
-    # Resultado en tiempo real) se muestran justo debajo.
+    # ── Encabezado dorado "QUINIELA · NOMBRE" (el título original) ─────
+    # Este texto ya existía DENTRO de la rueda SVG (con estilo dorado,
+    # serif, mayúsculas). Se saca de ahí y se sube como el primer
+    # elemento de la página, para que quede arriba de los botones de
+    # vista. Es dinámico: cambia a "TIEMPO REAL · NOMBRE" si el
+    # participante tiene seleccionada esa vista — igual que hacía antes
+    # dentro de la rueda. Usamos una key de session_state para poder
+    # leer la vista seleccionada ANTES de dibujar el radio de abajo.
+    _key_modo_vista = "modo_vista_radio"
+    _modo_vista_actual = st.session_state.get(_key_modo_vista, "Predicción completa")
+    _titulo_header = (
+        f"TIEMPO REAL · {participante_seleccionado.upper()}"
+        if _modo_vista_actual == "Resultado en tiempo real" else
+        f"QUINIELA · {participante_seleccionado.upper()}"
+    )
     st.markdown(f"""
         <style>
             .quiniela-page-header {{
                 text-align: center;
-                color: #d4a843;
+                color: #c8a84b;
                 font-family: 'Georgia', serif;
                 font-weight: normal;
-                letter-spacing: 4px;
-                font-size: 22px;
+                letter-spacing: 5px;
+                font-size: 24px;
                 text-transform: uppercase;
-                margin: 28px 0 14px 0;
+                margin: 30px 0 18px 0;
             }}
         </style>
-        <h1 class="quiniela-page-header">QUINIELA &middot; {participante_seleccionado.upper()}</h1>
+        <h1 class="quiniela-page-header">{_titulo_header}</h1>
     """, unsafe_allow_html=True)
 
     st.markdown("""
@@ -1027,18 +1038,15 @@ if participante_seleccionado:
             div[data-testid="stRadio"] > label {
                 display: none;
             }
-            /* ── ACCIÓN 2: centrado robusto en PC y móvil ─────────────
-               Antes solo el contenedor interno (radiogroup) tenía
-               margin:auto, lo que no garantizaba el centrado si el
-               contenedor padre de Streamlit usaba flex con alineación
-               a la izquierda en pantallas anchas. Forzamos aquí que el
-               propio div[data-testid="stRadio"] sea un flex-container
-               centrado, así el grupo de botones queda centrado sin
-               importar el ancho de pantalla. */
+            /* ── Centrado robusto en PC y móvil ───────────────────────
+               Se centra el propio widget (sin depender de st.columns,
+               que no garantizaba quedar centrado en pantallas anchas)
+               usando flex directamente sobre stRadio. */
             div[data-testid="stRadio"] {
                 display: flex !important;
                 flex-direction: column !important;
                 align-items: center !important;
+                justify-content: center !important;
                 width: 100% !important;
             }
             div[data-testid="stRadio"] div[role="radiogroup"] {
@@ -1081,21 +1089,16 @@ if participante_seleccionado:
         </style>
     """, unsafe_allow_html=True)
 
-    col_a, col_b, col_c = st.columns([1, 2, 1])
-    with col_b:
-        modo_vista = st.radio(
-            "Vista del bracket",
-            options=["Predicción completa", "Resultado en tiempo real"],
-            horizontal=True,
-            label_visibility="collapsed",
-        )
+    modo_vista = st.radio(
+        "Vista del bracket",
+        options=["Predicción completa", "Resultado en tiempo real"],
+        horizontal=True,
+        label_visibility="collapsed",
+        key=_key_modo_vista,
+    )
 
     usar_solo_madre = (modo_vista == "Resultado en tiempo real")
-    titulo_bracket = (
-        f"TIEMPO REAL · {participante_seleccionado.upper()}"
-        if usar_solo_madre else
-        f"QUINIELA · {participante_seleccionado.upper()}"
-    )
+    titulo_bracket = ""  # El título ya se muestra arriba como encabezado HTML; no se repite dentro de la rueda.
 
     bracket_html = construir_bracket_html(
         team_flags=hijo_team_flags,
