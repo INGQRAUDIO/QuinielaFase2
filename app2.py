@@ -812,8 +812,15 @@ def construir_tabla_detalle_html(titulo, subtitulo, tabla_bloque):
         background: linear-gradient(90deg, transparent, #c8a84b, transparent);
         margin: 0 auto 26px auto;
       }}
+      .table-scroll {{
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        width: 100%;
+        border-radius: 10px;
+      }}
       .quiniela-table {{
         width: 100%;
+        min-width: 560px;   /* evita que las columnas se compriman y las filas se envuelvan en móvil */
         border-collapse: collapse;
         background: rgba(20, 15, 5, 0.5);
         border: 1px solid #3a2e10;
@@ -831,6 +838,7 @@ def construir_tabla_detalle_html(titulo, subtitulo, tabla_bloque):
         border-bottom: 1px solid #c8a84b;
         text-align: center;
         font-weight: normal;
+        white-space: nowrap;
       }}
       .quiniela-row td {{
         padding: 11px 10px;
@@ -840,6 +848,7 @@ def construir_tabla_detalle_html(titulo, subtitulo, tabla_bloque):
         font-size: 13px;
         border-bottom: 1px solid #221a0a;
         transition: background 0.15s;
+        white-space: nowrap;
       }}
       .quiniela-row:hover td {{
         background: rgba(200, 168, 75, 0.08);
@@ -898,6 +907,16 @@ def construir_tabla_detalle_html(titulo, subtitulo, tabla_bloque):
         border: 1px dashed #3a2e10;
         border-radius: 10px;
       }}
+      /* ============ SOLO PARA MÓVILES (≤640px) ============ */
+      @media (max-width: 640px) {{
+        body {{ padding: 10px 6px 40px 6px; }}
+        h2.title {{ font-size: 15px; letter-spacing: 3px; }}
+        .subtitle {{ font-size: 9px; }}
+        .quiniela-table thead th {{ font-size: 9px; padding: 10px 6px; }}
+        .quiniela-row td {{ font-size: 11px; padding: 8px 6px; }}
+        .badge-ok, .badge-fail {{ font-size: 9px; padding: 2px 6px; }}
+        .madre-ref {{ font-size: 9px; }}
+      }}
     </style>
     </head>
     <body>
@@ -905,7 +924,9 @@ def construir_tabla_detalle_html(titulo, subtitulo, tabla_bloque):
         <h2 class="title">{titulo}</h2>
         <div class="subtitle">{subtitulo}</div>
         <div class="divider"></div>
-        {tabla_bloque}
+        <div class="table-scroll">
+          {tabla_bloque}
+        </div>
       </div>
     </body>
     </html>"""
