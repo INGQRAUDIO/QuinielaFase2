@@ -989,7 +989,11 @@ query_params = st.query_params
 participante_seleccionado = query_params.get("participant", None)
 
 if participante_seleccionado:
-    st.set_page_config(page_title=f"Quiniela de {participante_seleccionado}", layout="wide")
+    st.set_page_config(
+        page_title=f"Quiniela de {participante_seleccionado}",
+        page_icon="https://static.wikia.nocookie.net/logopedia/images/9/90/FIFA_World_Cup_trophy.png/revision/latest?cb=20260701115015",
+        layout="wide",
+    )
     st.markdown("""
         <style>
             .stApp { background-color: #0a0a0a; }
@@ -1303,7 +1307,12 @@ if participante_seleccionado:
 # ════════════════════════════════════════════════════════════════════
 #  RUEDA MADRE (página principal)
 # ════════════════════════════════════════════════════════════════════
-st.set_page_config(page_title="Quiniela Fase 2 909", layout="wide", initial_sidebar_state="collapsed")
+st.set_page_config(
+    page_title="Quiniela Fase 2 909",
+    page_icon="https://static.wikia.nocookie.net/logopedia/images/9/90/FIFA_World_Cup_trophy.png/revision/latest?cb=20260701115015",
+    layout="wide",
+    initial_sidebar_state="collapsed",
+)
 
 st.markdown("""
 <style>
