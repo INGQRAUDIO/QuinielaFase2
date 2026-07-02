@@ -1044,7 +1044,7 @@ if participante_seleccionado:
 
 
 
-    col_a, col_b, col_c = st.columns([1, 1, 1])
+    col_a, col_b, col_c = st.columns([1, 2, 1])
     with col_b:
         modo_vista = st.radio(
             "Vista del bracket",
