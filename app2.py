@@ -10,8 +10,22 @@ from collections import defaultdict
 from PIL import Image
 
 # ── Ícono de pestaña (Iconos/DOCopa.png en el repositorio) ──────────
+# Se convierte a un canvas cuadrado con fondo transparente antes de
+# pasarlo a Streamlit, para que no se deforme al mostrarse en la pestaña.
+def _cargar_icono(ruta, tam=64):
+    """Abre la imagen y la centra en un canvas cuadrado transparente."""
+    img = Image.open(ruta).convert("RGBA")
+    w, h = img.size
+    lado = max(w, h)
+    canvas = Image.new("RGBA", (lado, lado), (0, 0, 0, 0))
+    offset_x = (lado - w) // 2
+    offset_y = (lado - h) // 2
+    canvas.paste(img, (offset_x, offset_y), img)
+    canvas = canvas.resize((tam, tam), Image.LANCZOS)
+    return canvas
+
 _ICON_PATH = os.path.join(os.path.dirname(__file__), "Iconos", "DOCopa.png")
-_PAGE_ICON = Image.open(_ICON_PATH) if os.path.exists(_ICON_PATH) else "🏆"
+_PAGE_ICON = _cargar_icono(_ICON_PATH) if os.path.exists(_ICON_PATH) else "🏆"
 
 
 # ─── Supabase ────────────────────────────────────────────────────────
