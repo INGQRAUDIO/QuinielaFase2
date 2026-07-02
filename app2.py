@@ -7,6 +7,11 @@ import json
 import requests
 import urllib.parse
 from collections import defaultdict
+from PIL import Image
+
+# ── Ícono de pestaña (Iconos/DOCopa.png en el repositorio) ──────────
+_ICON_PATH = os.path.join(os.path.dirname(__file__), "Iconos", "DOCopa.png")
+_PAGE_ICON = Image.open(_ICON_PATH) if os.path.exists(_ICON_PATH) else "🏆"
 
 
 # ─── Supabase ────────────────────────────────────────────────────────
@@ -991,7 +996,7 @@ participante_seleccionado = query_params.get("participant", None)
 if participante_seleccionado:
     st.set_page_config(
         page_title=f"Quiniela de {participante_seleccionado}",
-        page_icon="https://static.wikia.nocookie.net/logopedia/images/9/90/FIFA_World_Cup_trophy.png/revision/latest?cb=20260701115015",
+        page_icon=_PAGE_ICON,
         layout="wide",
     )
     st.markdown("""
@@ -1309,7 +1314,7 @@ if participante_seleccionado:
 # ════════════════════════════════════════════════════════════════════
 st.set_page_config(
     page_title="Quiniela Fase 2 909",
-    page_icon="https://static.wikia.nocookie.net/logopedia/images/9/90/FIFA_World_Cup_trophy.png/revision/latest?cb=20260701115015",
+    page_icon=_PAGE_ICON,
     layout="wide",
     initial_sidebar_state="collapsed",
 )
