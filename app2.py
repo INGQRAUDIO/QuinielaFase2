@@ -866,7 +866,7 @@ def construir_tabla_detalle_html(titulo, subtitulo, tabla_bloque, ocultar_column
       .quiniela-row:last-child td {{ border-bottom: none; }}
       .col-num {{ color: #7a6535; width: 40px; }}
       .col-celda {{ width: 60px; }}
-      .col-pais {{ width: 120px; text-align: left !important; padding-left: 12px !important; }}
+      .col-pais {{ width: 100px; text-align: left !important; padding-left: 12px !important; }}
       .col-goles {{ color: #c8a84b; font-weight: bold; width: 80px; }}
       .col-goles-madre {{ color: #e8d080; width: 90px; }}
       .col-estado {{ width: 130px; }}
