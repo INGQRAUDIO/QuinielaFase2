@@ -245,7 +245,8 @@ madre_r16_flags = {
     "A10": ("fr.svg", "Francia"),
     "B11": ("mx.svg", "México"),
     "B12": ("gb-eng.svg", "Inglaterra"),
-    "C12": ("be.svg", "Bélgica")
+    "C12": ("be.svg", "Bélgica"),
+    "C11": ("us.svg", "Estados Unidos"),
 }
 madre_qf_flags = {}
 madre_sf_flags = {}
@@ -262,7 +263,8 @@ goles_madre_r32 = {
     "A2": 3, "A6": 0,
     "B7": 2, "B3": 0,
     "B8": 2, "B4": 1,
-    "C4": 3, "C8": 2
+    "C4": 3, "C8": 2,
+    "C3": 2, "C7": 0,
 }
 goles_madre_r16 = {}
 goles_madre_qf = {}
