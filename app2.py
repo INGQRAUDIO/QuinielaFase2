@@ -301,6 +301,20 @@ def _construir_resultados_madre():
 resultados_madre_por_celda = _construir_resultados_madre()
 
 
+@st.cache_data(ttl=3600)
+def _fetch_trophy_b64():
+    """Descarga la imagen del trofeo FIFA y la devuelve en base64.
+    Se cachea 1 hora para no hacer requests repetidos en cada re-render."""
+    url = "https://static.wikia.nocookie.net/logopedia/images/9/90/FIFA_World_Cup_trophy.png/revision/latest?cb=20260701115015"
+    try:
+        resp = requests.get(url, timeout=8)
+        resp.raise_for_status()
+        b64 = base64.b64encode(resp.content).decode("utf-8")
+        return f"data:image/png;base64,{b64}"
+    except Exception:
+        return None
+
+
 def d2r(deg): return deg * math.pi / 180
 
 
@@ -639,12 +653,16 @@ def construir_bracket_html(
     <circle cx="{CX}" cy="{CY}" r="260" fill="url(#glow_grad)"/>
     """)
 
-    node_els.append(
-        f'<circle cx="{CX}" cy="{CY}" r="{RC}" '
-        f'fill="#1a1200" stroke="{C["glow"]}" stroke-width="2.5"/>'
-    )
+    node_els.append(f"""
+    <defs>
+      <clipPath id="champ_clip">
+        <circle cx="{CX}" cy="{CY}" r="{RC + 22}"/>
+      </clipPath>
+    </defs>
+    """)
 
     if 0 in champion_loaded:
+        # Si hay bandera de campeón definida, la mostramos en el círculo central
         node_els.append(
             f'<circle cx="{CX}" cy="{CY}" r="{CHAMP_NODE_R}" '
             f'fill="url(#flag_champion_0)" stroke="{C["glow"]}" stroke-width="2.5" '
@@ -652,10 +670,32 @@ def construir_bracket_html(
         )
         gol_label(CX, CY, goles_madre.get(champion_key_map.get(0)))
     else:
-        node_els.append(
-            f'<text x="{CX}" y="{CY + 9}" text-anchor="middle" '
-            f'font-size="26" font-family="serif">🏆</text>'
-        )
+        # Sin campeón definido: mostramos la imagen real del trofeo FIFA.
+        # La descargamos en tiempo de ejecución y la embebemos en base64 para
+        # evitar bloqueos CORS cuando el SVG se renderiza dentro del iframe de
+        # components.html.
+        trophy_size = (RC + 22) * 2
+        trophy_x   = CX - (RC + 22)
+        trophy_y   = CY - (RC + 22)
+
+        try:
+            trophy_href = _fetch_trophy_b64()
+        except Exception:
+            trophy_href = None
+
+        if trophy_href:
+            node_els.append(
+                f'<image href="{trophy_href}" '
+                f'x="{trophy_x:.1f}" y="{trophy_y:.1f}" '
+                f'width="{trophy_size}" height="{trophy_size}" '
+                f'clip-path="url(#champ_clip)" '
+                f'preserveAspectRatio="xMidYMid meet"/>'
+            )
+        else:
+            node_els.append(
+                f'<text x="{CX}" y="{CY + 9}" text-anchor="middle" '
+                f'font-size="26" font-family="serif">🏆</text>'
+            )
 
     node_els.append(
         f'<text x="{CX}" y="26" text-anchor="middle" fill="{C["gold"]}" '
