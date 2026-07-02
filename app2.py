@@ -772,7 +772,12 @@ wireTooltip('.champion-node', championNames, true);
 # ════════════════════════════════════════════════════════════════════
 #  FUNCIÓN REUTILIZABLE: tabla de resultados con el diseño estándar
 # ════════════════════════════════════════════════════════════════════
-def construir_tabla_detalle_html(titulo, subtitulo, tabla_bloque):
+def construir_tabla_detalle_html(titulo, subtitulo, tabla_bloque, ocultar_columnas=None):
+    ocultar_columnas = ocultar_columnas or []
+    ocultar_css = "\n".join(
+        f"      th.{clase}, td.{clase} {{ display: none !important; }}"
+        for clase in ocultar_columnas
+    )
     return f"""<!DOCTYPE html>
     <html>
     <head>
@@ -921,6 +926,7 @@ def construir_tabla_detalle_html(titulo, subtitulo, tabla_bloque):
         .badge-ok, .badge-fail {{ font-size: 9px; padding: 2px 6px; }}
         .madre-ref {{ font-size: 9px; }}
       }}
+      {ocultar_css}
     </style>
     </head>
     <body>
@@ -1118,7 +1124,7 @@ if participante_seleccionado:
         <table class="quiniela-table">
             <thead>
                 <tr>
-                    <th>#</th><th>Celda</th><th>País</th><th>Estado</th>
+                    <th>#</th><th class="col-celda">Celda</th><th>País</th><th>Estado</th>
                 </tr>
             </thead>
             <tbody>
@@ -1192,7 +1198,7 @@ if participante_seleccionado:
         footer_goles = f"""
         <tfoot>
             <tr class="quiniela-footer">
-                <td colspan="5" class="footer-label">Total de aciertos</td>
+                <td colspan="4" class="footer-label">Total de aciertos</td>
                 <td class="footer-valor">{total_aciertos_goles}/{total_con_resultado_goles}</td>
             </tr>
         </tfoot>
@@ -1202,7 +1208,7 @@ if participante_seleccionado:
         <table class="quiniela-table">
             <thead>
                 <tr>
-                    <th>#</th><th>Celda</th><th>País</th><th>Goles P</th><th>Goles R</th><th>Comparación</th>
+                    <th>#</th><th class="col-celda">Celda</th><th>País</th><th>Goles P</th><th>Goles R</th><th>Comparación</th>
                 </tr>
             </thead>
             <tbody>
@@ -1220,6 +1226,7 @@ if participante_seleccionado:
         titulo="Goles Dieciseisavos",
         subtitulo="Verde = goles exactos &middot; Rojo = no coincide",
         tabla_bloque=tabla_goles,
+        ocultar_columnas=["col-celda"],
     )
     st.components.v1.html(goles_dieciseisavos_html, height=altura_goles, scrolling=False)
 
