@@ -8,6 +8,8 @@ import requests
 import urllib.parse
 from collections import defaultdict
 from PIL import Image
+from datetime import datetime
+import pytz
 
 # ── Ícono de pestaña (Iconos/DOCopa.png en el repositorio) ──────────
 # Se convierte a un canvas cuadrado con fondo transparente antes de
@@ -248,6 +250,7 @@ madre_r16_flags = {
     "C12": ("be.svg", "Bélgica"),
     "C11": ("us.svg", "Estados Unidos"),
     "C10": ("es.svg", "España"),
+    "C9": ("pt.svg", "Portugal"),
 }
 madre_qf_flags = {}
 madre_sf_flags = {}
@@ -267,6 +270,7 @@ goles_madre_r32 = {
     "C4": 3, "C8": 2,
     "C3": 2, "C7": 0,
     "C2": 3, "C6": 0,
+    "C1": 1, "C5": 2,
 }
 goles_madre_r16 = {}
 goles_madre_qf = {}
@@ -1357,6 +1361,419 @@ bracket_html = construir_bracket_html(
 )
 
 components.html(bracket_html, height=SVG_HEIGHT + 60, scrolling=False)
+
+# ════════════════════════════════════════════════════════════════════
+#  PANEL BONUS
+# ════════════════════════════════════════════════════════════════════
+# CÓMO REUTILIZAR ESTE PANEL PARA FUTUROS BONUS:
+# ─────────────────────────────────────────────────────────────────────
+# Cambia estas variables manualmente para cada nuevo bonus:
+#   BONUS_NUMBER        → número identificador (1, 2, 3…)
+#   BONUS_EQUIPO1/2     → código de bandera ("dz"=Argelia, "ch"=Suiza…)
+#   bonus_visible       → True = visible para usuarios / False = oculto
+#   BONUS_FECHA         → fecha de activación "DD/MM/YYYY"
+#   BONUS_HORA_INICIO   → hora de apertura "HH:MM" (CDMX)
+#   BONUS_HORA_FIN      → hora de cierre   "HH:MM" (CDMX)
+# ─────────────────────────────────────────────────────────────────────
+
+BONUS_NUMBER      = 1           # ← identificador del bonus
+BONUS_EQUIPO1     = "dz"        # ← equipo 1 (Argelia)
+BONUS_EQUIPO2     = "ch"        # ← equipo 2 (Suiza)
+
+# ── Visibilidad manual ───────────────────────────────────────────────
+# True  → el bonus se muestra (sujeto además a la ventana de tiempo)
+# False → el bonus está oculto sin importar fecha/hora
+bonus_visible = True
+
+# ── Ventana de tiempo de activación (hora CDMX = America/Mexico_City) ─
+# Formato fecha: "DD/MM/YYYY"    Formato hora: "HH:MM" en 24h
+BONUS_FECHA       = "02/07/2026"
+BONUS_HORA_INICIO = "20:30"
+BONUS_HORA_FIN    = "20:40"
+
+# ── Cálculo de estado temporal ───────────────────────────────────────
+_TZ_CDMX = pytz.timezone("America/Mexico_City")
+_ahora   = datetime.now(_TZ_CDMX)
+
+def _parse_ventana():
+    """Devuelve (dt_inicio, dt_fin) localizados en CDMX."""
+    dia, mes, anio = BONUS_FECHA.split("/")
+    h_ini, m_ini  = BONUS_HORA_INICIO.split(":")
+    h_fin, m_fin  = BONUS_HORA_FIN.split(":")
+    inicio = _TZ_CDMX.localize(datetime(int(anio), int(mes), int(dia),
+                                         int(h_ini), int(m_ini), 0))
+    fin    = _TZ_CDMX.localize(datetime(int(anio), int(mes), int(dia),
+                                         int(h_fin), int(m_fin), 0))
+    return inicio, fin
+
+_bonus_inicio, _bonus_fin = _parse_ventana()
+_bonus_activo   = bonus_visible and (_bonus_inicio <= _ahora <= _bonus_fin)
+_bonus_pendiente = bonus_visible and (_ahora < _bonus_inicio)
+_bonus_cerrado  = bonus_visible and (_ahora > _bonus_fin)
+
+# ── Datos de los equipos ─────────────────────────────────────────────
+_nombre_eq1 = flag_to_country.get(BONUS_EQUIPO1, BONUS_EQUIPO1)
+_nombre_eq2 = flag_to_country.get(BONUS_EQUIPO2, BONUS_EQUIPO2)
+
+def _bandera_b64(codigo):
+    ruta = f"Banderas/{codigo}.svg"
+    if os.path.exists(ruta):
+        with open(ruta, "rb") as f:
+            return "data:image/svg+xml;base64," + base64.b64encode(f.read()).decode()
+    return ""
+
+_b64_eq1 = _bandera_b64(BONUS_EQUIPO1)
+_b64_eq2 = _bandera_b64(BONUS_EQUIPO2)
+
+def _enviar_bonus(nombre_participante):
+    """Inserta un registro en la tabla BonusCheck de Supabase."""
+    headers = {
+        "apikey": SUPABASE_KEY,
+        "Authorization": f"Bearer {SUPABASE_KEY}",
+        "Content-Type": "application/json",
+        "Prefer": "return=minimal",
+    }
+    payload = {
+        "nombre":       nombre_participante,
+        "bonus_number": BONUS_NUMBER,
+        "equipo1":      _nombre_eq1,
+        "equipo2":      _nombre_eq2,
+    }
+    try:
+        resp = requests.post(
+            f"{SUPABASE_URL}/rest/v1/BonusCheck",
+            headers=headers,
+            json=payload,
+            timeout=8,
+        )
+        return resp.status_code in (200, 201)
+    except Exception:
+        return False
+
+# ── Estado de sesión ─────────────────────────────────────────────────
+if "bonus_abierto"   not in st.session_state: st.session_state.bonus_abierto   = False
+if "bonus_enviado"   not in st.session_state: st.session_state.bonus_enviado   = False
+if "bonus_seleccion" not in st.session_state: st.session_state.bonus_seleccion = None
+
+_lista_bonus = obtener_participantes() or []
+
+# ── Solo renderizamos el panel si bonus_visible = True ───────────────
+if bonus_visible:
+
+    _, col_bonus, _ = st.columns([1, 2, 1])
+
+    with col_bonus:
+
+        # ── CSS del panel ────────────────────────────────────────────
+        st.markdown("""
+        <style>
+        .bonus-panel {
+            background: linear-gradient(180deg, #110d04 0%, #0a0a0a 100%);
+            border: 1px solid #3a2e10;
+            border-radius: 12px;
+            padding: 22px 20px 24px 20px;
+        }
+        .bonus-title {
+            text-align: center;
+            color: #d4a843;
+            font-family: 'Georgia', serif;
+            font-size: 14px;
+            letter-spacing: 4px;
+            text-transform: uppercase;
+            margin-bottom: 6px;
+        }
+        .bonus-subtitle {
+            text-align: center;
+            color: #7a6535;
+            font-family: monospace;
+            font-size: 10px;
+            white-space: pre-wrap;
+            letter-spacing: 2px;
+            margin-bottom: 14px;
+        }
+        .bonus-divider {
+            width: 80px;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, #c8a84b, transparent);
+            margin: 0 auto 18px auto;
+        }
+        /* Banderas lado a lado con nombre debajo de cada una */
+        .bonus-matchup {
+            display: flex;
+            align-items: flex-start;
+            justify-content: center;
+            gap: 18px;
+            margin-bottom: 18px;
+        }
+        .bonus-team {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+        }
+        .bonus-team img {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            border: 2px solid #c8a84b;
+            object-fit: cover;
+        }
+        .bonus-team-name {
+            color: #d8cba8;
+            font-family: monospace;
+            font-size: 11px;
+            text-align: center;
+            letter-spacing: 1px;
+        }
+        .bonus-vs-label {
+            color: #7a6535;
+            font-family: monospace;
+            font-size: 13px;
+            letter-spacing: 2px;
+            margin-top: 18px;
+        }
+        /* Contador de tiempo */
+        .bonus-countdown {
+            text-align: center;
+            font-family: monospace;
+            font-size: 11px;
+            color: #d4a843;
+            background: rgba(212,168,67,0.07);
+            border: 1px solid #3a2e10;
+            border-radius: 8px;
+            padding: 8px 12px;
+            margin-bottom: 14px;
+            letter-spacing: 1px;
+        }
+        .bonus-countdown-num {
+            font-size: 20px;
+            font-weight: bold;
+            color: #f0d060;
+            letter-spacing: 3px;
+            display: block;
+            margin-top: 4px;
+        }
+        .bonus-cerrado {
+            text-align: center;
+            color: #e0473e;
+            font-family: monospace;
+            font-size: 11px;
+            padding: 10px;
+            border: 1px solid #8a2a24;
+            border-radius: 8px;
+            background: rgba(224,71,62,0.07);
+            letter-spacing: 1px;
+        }
+        .bonus-ok {
+            text-align: center;
+            color: #3ddc6e;
+            font-family: monospace;
+            font-size: 11px;
+            margin-top: 8px;
+            padding: 8px;
+            border: 1px solid #2a8a4a;
+            border-radius: 6px;
+            background: rgba(61,220,110,0.07);
+        }
+        .bonus-err {
+            text-align: center;
+            color: #e0473e;
+            font-family: monospace;
+            font-size: 11px;
+            margin-top: 8px;
+            padding: 6px;
+            border: 1px solid #8a2a24;
+            border-radius: 6px;
+            background: rgba(224,71,62,0.07);
+        }
+        /* Botones centrados */
+        div[data-testid="stButton"],
+        .stButton {
+            display: flex !important;
+            justify-content: center !important;
+            width: 100% !important;
+        }
+        div[data-testid="element-container"]:has(div[data-testid="stButton"]) {
+            display: flex !important;
+            justify-content: center !important;
+        }
+        div[data-testid="stButton"] > button,
+        .stButton > button {
+            background: linear-gradient(180deg, #1e1608, #110d04) !important;
+            color: #d4a843 !important;
+            border: 1px solid #5a4520 !important;
+            border-radius: 8px !important;
+            font-family: monospace !important;
+            letter-spacing: 2px !important;
+            font-size: 12px !important;
+            width: auto !important;
+            min-width: 180px !important;
+            padding: 10px 20px !important;
+            transition: all 0.15s !important;
+            margin: 0 auto !important;
+        }
+        div[data-testid="stButton"] > button:hover,
+        .stButton > button:hover {
+            border-color: #c8a84b !important;
+            color: #f0d060 !important;
+            background: linear-gradient(180deg, #2a1e08, #160f04) !important;
+        }
+        div[data-testid="stSelectbox"] > div > div {
+            background: #110d04 !important;
+            border: 1px solid #3a2e10 !important;
+            color: #d8cba8 !important;
+            font-family: monospace !important;
+            border-radius: 8px !important;
+        }
+        </style>
+        """, unsafe_allow_html=True)
+
+        # ── Cuerpo del panel ─────────────────────────────────────────
+        st.markdown('<div class="bonus-panel">', unsafe_allow_html=True)
+        st.markdown('<div class="bonus-title">⚡ Bonus</div>', unsafe_allow_html=True)
+        st.markdown(
+            f'<div class="bonus-subtitle">'
+            f'{BONUS_FECHA} · {BONUS_HORA_INICIO} – {BONUS_HORA_FIN} CDMX\n'
+            f'Este bonus vale 5 puntos extra, Aplica para goles y pase de país a siguiete ronda\n'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
+        st.markdown('<div class="bonus-divider"></div>', unsafe_allow_html=True)
+
+        # Banderas con nombre debajo de cada una
+        flag1_html = f'<img src="{_b64_eq1}"/>' if _b64_eq1 else "🏳"
+        flag2_html = f'<img src="{_b64_eq2}"/>' if _b64_eq2 else "🏳"
+        st.markdown(f"""
+        <div class="bonus-matchup">
+            <div class="bonus-team">
+                {flag1_html}
+                <span class="bonus-team-name">{_nombre_eq1}</span>
+            </div>
+            <span class="bonus-vs-label">VS</span>
+            <div class="bonus-team">
+                {flag2_html}
+                <span class="bonus-team-name">{_nombre_eq2}</span>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        # ── Contador JavaScript en tiempo real ───────────────────────
+        # Se recalcula cada segundo en el navegador usando la hora del
+        # servidor (CDMX) que se inyecta en el HTML como timestamp Unix.
+        _ts_inicio = int(_bonus_inicio.timestamp())
+        _ts_fin    = int(_bonus_fin.timestamp())
+        _ts_ahora  = int(_ahora.timestamp())
+
+        _countdown_html = f"""
+        <div id="bonus-cd" class="bonus-countdown">
+            <span id="cd-label">Cargando…</span>
+            <span class="bonus-countdown-num" id="cd-time">--:--:--</span>
+        </div>
+        <script>
+        (function() {{
+            const tsInicio = {_ts_inicio};
+            const tsFin    = {_ts_fin};
+            const offset   = {_ts_ahora} - Math.floor(Date.now() / 1000);
+
+            function fmt(s) {{
+                const h = String(Math.floor(s/3600)).padStart(2,'0');
+                const m = String(Math.floor((s%3600)/60)).padStart(2,'0');
+                const ss = String(s%60).padStart(2,'0');
+                return h+':'+m+':'+ss;
+            }}
+
+            function tick() {{
+                const now = Math.floor(Date.now()/1000) + offset;
+                const lbl = document.getElementById('cd-label');
+                const tim = document.getElementById('cd-time');
+                if (!lbl || !tim) return;
+
+                if (now < tsInicio) {{
+                    lbl.textContent = '⏳ Abre en';
+                    lbl.style.color = '#d4a843';
+                    tim.style.color = '#f0d060';
+                    tim.textContent = fmt(tsInicio - now);
+                }} else if (now <= tsFin) {{
+                    lbl.textContent = '🟢 Cierra en';
+                    lbl.style.color = '#3ddc6e';
+                    tim.style.color = '#3ddc6e';
+                    tim.textContent = fmt(tsFin - now);
+                }} else {{
+                    lbl.textContent = '🔴 Bonus cerrado';
+                    lbl.style.color = '#e0473e';
+                    tim.style.color = '#e0473e';
+                    tim.textContent = '00:00:00';
+                    clearInterval(timer);
+                }}
+            }}
+
+            tick();
+            const timer = setInterval(tick, 1000);
+        }})();
+        </script>
+        """
+        components.html(_countdown_html, height=80)
+
+        # ── Lógica de interacción según estado temporal ───────────────
+        if _bonus_activo:
+            # Bonus abierto: mostrar interacción completa
+            if not st.session_state.bonus_enviado:
+                if not st.session_state.bonus_abierto:
+                    _bl1, _bm1, _br1 = st.columns([1, 2, 1])
+                    with _bm1:
+                        if st.button(
+                            "ACEPTAR BONUS",
+                            key="btn_bonus_toggle",
+                            use_container_width=True,
+                        ):
+                            st.session_state.bonus_abierto   = True
+                            st.session_state.bonus_seleccion = None
+                            st.rerun()
+
+                if st.session_state.bonus_abierto and _lista_bonus:
+                    seleccion = st.selectbox(
+                        "Participante",
+                        options=["— elige —"] + _lista_bonus,
+                        key="bonus_select",
+                        label_visibility="collapsed",
+                    )
+                    if seleccion != "— elige —":
+                        st.session_state.bonus_seleccion = seleccion
+
+                    if st.session_state.bonus_seleccion:
+                        _bl2, _bm2, _br2 = st.columns([1, 2, 1])
+                        with _bm2:
+                            if st.button("✓ ENVIAR", key="btn_bonus_enviar", use_container_width=True):
+                                ok = _enviar_bonus(st.session_state.bonus_seleccion)
+                                if ok:
+                                    st.session_state.bonus_enviado = True
+                                    st.session_state.bonus_abierto = False
+                                    st.rerun()
+                                else:
+                                    st.markdown(
+                                        '<div class="bonus-err">Error al enviar. Intenta de nuevo.</div>',
+                                        unsafe_allow_html=True,
+                                    )
+            else:
+                st.markdown(
+                    f'<div class="bonus-ok">✓ Bonus registrado<br/>'
+                    f'<span style="opacity:.7">{st.session_state.bonus_seleccion}</span></div>',
+                    unsafe_allow_html=True,
+                )
+
+
+
+        elif _bonus_pendiente:
+            # Todavía no abre: solo mostrar el contador (ya se ve arriba)
+            pass
+
+        elif _bonus_cerrado:
+            st.markdown(
+                '<div class="bonus-cerrado">🔴 El tiempo de este bonus ha cerrado.</div>',
+                unsafe_allow_html=True,
+            )
+
+        st.markdown('</div>', unsafe_allow_html=True)  # cierra .bonus-panel
 
 # ════════════════════════════════════════════════════════════════════
 #  TABLA DE PARTICIPANTES (con aciertos y ordenación)
