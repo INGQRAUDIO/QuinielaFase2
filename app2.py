@@ -272,6 +272,7 @@ goles_madre_r32 = {
     "C3": 2, "C7": 0,
     "C2": 3, "C6": 0,
     "C1": 1, "C5": 2,
+    "D3": 2, "D7": 0,
 }
 goles_madre_r16 = {}
 goles_madre_qf = {}
