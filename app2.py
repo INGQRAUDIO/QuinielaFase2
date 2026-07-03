@@ -154,6 +154,149 @@ def calcular_aciertos_por_participante(rows):
 
 
 # ════════════════════════════════════════════════════════════════════
+#  PUNTOS EXTRA DE BONUS
+# ════════════════════════════════════════════════════════════════════
+# Cada bonus está ligado a un cruce específico de Dieciseisavos (2 equipos).
+# Un participante que se registró en ese bonus (tabla BonusCheck) gana
+# PUNTOS_POR_ACIERTO_BONUS por cada acierto CORRECTO que tenía, de forma
+# independiente, en sus 3 predicciones relacionadas con ese cruce:
+#   1) "¿Quién pasa a Octavos?"      → celda de Octavos del cruce
+#   2) "Goles Dieciseisavos" equipo 1 → celda de goles del equipo 1
+#   3) "Goles Dieciseisavos" equipo 2 → celda de goles del equipo 2
+# Si acierta las 3, gana 3 × PUNTOS_POR_ACIERTO_BONUS puntos extra.
+# Estos puntos se basan en lo que el participante puso ORIGINALMENTE en su
+# quiniela (Quiniela_Fase2), no en la selección hecha dentro del panel de
+# bonus (esa selección solo sirve para registrar quién participa).
+# ─────────────────────────────────────────────────────────────────────
+PUNTOS_POR_ACIERTO_BONUS = 3
+
+
+@st.cache_data(ttl=0)
+def obtener_registros_bonus():
+    """Devuelve todas las filas de la tabla BonusCheck (quién se registró en cada bonus)."""
+    headers = {
+        "apikey": SUPABASE_KEY,
+        "Authorization": f"Bearer {SUPABASE_KEY}"
+    }
+    all_rows = []
+    limit = 1000
+    offset = 0
+    while True:
+        url = f"{SUPABASE_URL}/rest/v1/BonusCheck?select=*&limit={limit}&offset={offset}"
+        try:
+            resp = requests.get(url, headers=headers)
+            resp.raise_for_status()
+            batch = resp.json()
+            if not batch:
+                break
+            all_rows.extend(batch)
+            offset += limit
+        except Exception as e:
+            st.error(f"Error al obtener registros de bonus: {e}")
+            return []
+    return all_rows
+
+
+def _celdas_bonus_desde_equipos(codigo_eq1, codigo_eq2):
+    """A partir de los códigos de bandera de los 2 equipos de un cruce de
+    Dieciseisavos, calcula automáticamente las celdas involucradas:
+      - celda_eq1 / celda_eq2 → celdas de "Goles Dieciseisavos" de cada equipo
+      - celda_r16             → celda de "¿Quién pasa a Octavos?" de ese cruce
+    """
+    celda_eq1 = next(
+        (c for c, archivo in herencia_fija.items() if archivo == f"{codigo_eq1}.svg"), None
+    )
+    celda_eq2 = next(
+        (c for c, archivo in herencia_fija.items() if archivo == f"{codigo_eq2}.svg"), None
+    )
+    celda_r16 = None
+    _index_por_celda = {v: k for k, v in mapeo_circulo_a_indice.items()}
+    if celda_eq1 in _index_por_celda and celda_eq2 in _index_por_celda:
+        idx_par = _index_por_celda[celda_eq1] // 2
+        celda_r16 = r16_key_map.get(idx_par)
+    return celda_eq1, celda_eq2, celda_r16
+
+
+def calcular_puntos_bonus_todos(registros_bonus, todos_los_registros):
+    """
+    Calcula, para TODOS los bonus ya registrados en Supabase (tabla
+    BonusCheck), los puntos extra ganados por cada participante inscrito.
+
+    Devuelve:
+      puntos_totales      → {nombre: puntos_bonus_acumulados_de_todos_los_bonus}
+      detalle_por_persona → {nombre: [ {bonus_number, equipo1, equipo2, puntos}, ... ]}
+    """
+    # Índice de predicciones originales: (nombre, celda) -> fila
+    prediccion = {}
+    for row in todos_los_registros:
+        nombre = (row.get("nombre") or "").strip()
+        celda  = (row.get("celda") or "").strip()
+        if nombre and celda:
+            prediccion[(nombre, celda)] = row
+
+    # Agrupar los registros de bonus por cruce (bonus_number, equipo1, equipo2)
+    bonus_grupos = defaultdict(list)
+    for reg in registros_bonus:
+        clave = (reg.get("bonus_number"), reg.get("equipo1"), reg.get("equipo2"))
+        nombre = (reg.get("nombre") or "").strip()
+        if nombre:
+            bonus_grupos[clave].append(nombre)
+
+    puntos_totales = defaultdict(int)
+    detalle_por_persona = defaultdict(list)
+
+    for (bonus_number, pais1, pais2), nombres in bonus_grupos.items():
+        codigo_eq1 = country_to_flag.get(pais1)
+        codigo_eq2 = country_to_flag.get(pais2)
+        celda_eq1 = celda_eq2 = celda_r16 = None
+        if codigo_eq1 and codigo_eq2:
+            celda_eq1, celda_eq2, celda_r16 = _celdas_bonus_desde_equipos(codigo_eq1, codigo_eq2)
+
+        pais_real_r16  = resultados_madre_por_celda.get(celda_r16) if celda_r16 else None
+        goles_real_eq1 = goles_madre_por_celda.get(celda_eq1) if celda_eq1 else None
+        goles_real_eq2 = goles_madre_por_celda.get(celda_eq2) if celda_eq2 else None
+
+        for nombre in nombres:
+            puntos = 0
+
+            # 1) ¿Quién pasa a Octavos?
+            if pais_real_r16 and celda_r16:
+                fila = prediccion.get((nombre, celda_r16))
+                if fila and (fila.get("pais") or "").strip() == pais_real_r16:
+                    puntos += PUNTOS_POR_ACIERTO_BONUS
+
+            # 2) Goles Dieciseisavos — equipo 1
+            if goles_real_eq1 is not None and celda_eq1:
+                fila = prediccion.get((nombre, celda_eq1))
+                if fila:
+                    try:
+                        if int(fila.get("goles")) == int(goles_real_eq1):
+                            puntos += PUNTOS_POR_ACIERTO_BONUS
+                    except (ValueError, TypeError):
+                        pass
+
+            # 3) Goles Dieciseisavos — equipo 2
+            if goles_real_eq2 is not None and celda_eq2:
+                fila = prediccion.get((nombre, celda_eq2))
+                if fila:
+                    try:
+                        if int(fila.get("goles")) == int(goles_real_eq2):
+                            puntos += PUNTOS_POR_ACIERTO_BONUS
+                    except (ValueError, TypeError):
+                        pass
+
+            puntos_totales[nombre] += puntos
+            detalle_por_persona[nombre].append({
+                "bonus_number": bonus_number,
+                "equipo1": pais1,
+                "equipo2": pais2,
+                "puntos": puntos,
+            })
+
+    return dict(puntos_totales), dict(detalle_por_persona)
+
+
+# ════════════════════════════════════════════════════════════════════
 #  CONFIGURACIÓN GEOMÉTRICA DEL BRACKET (compartida por madre e hijas)
 # ════════════════════════════════════════════════════════════════════
 SIZE = 900
@@ -1303,6 +1446,65 @@ if participante_seleccionado:
     )
     st.components.v1.html(goles_dieciseisavos_html, height=altura_goles, scrolling=False)
 
+    # ── TABLA "INSIGNIAS" (bonus en los que participó) ─────────────────
+    _registros_bonus_todos = obtener_registros_bonus()
+    _, _detalle_bonus_todos = calcular_puntos_bonus_todos(_registros_bonus_todos, datos)
+    insignias_participante = sorted(
+        _detalle_bonus_todos.get(participante_seleccionado, []),
+        key=lambda b: b["bonus_number"],
+    )
+
+    if insignias_participante:
+        filas_insignias = ""
+        for i, ins in enumerate(insignias_participante, start=1):
+            puntos = ins["puntos"]
+            badge_puntos = (
+                f'<span class="badge-ok">+{puntos} pts</span>' if puntos > 0
+                else '<span class="badge-fail">0 pts</span>'
+            )
+            filas_insignias += f"""
+            <tr class="quiniela-row">
+                <td class="col-num">{i}</td>
+                <td class="col-pais" style="text-align:center !important;">Bonus {ins['bonus_number']}</td>
+                <td class="col-pais">{ins['equipo1']} vs {ins['equipo2']}</td>
+                <td class="col-estado">{badge_puntos}</td>
+            </tr>
+            """
+        total_puntos_insignias = sum(b["puntos"] for b in insignias_participante)
+        footer_insignias = f"""
+        <tfoot>
+            <tr class="quiniela-footer">
+                <td colspan="3" class="footer-label">Total puntos de bonus</td>
+                <td class="footer-valor">{total_puntos_insignias}</td>
+            </tr>
+        </tfoot>
+        """
+        tabla_insignias = f"""
+        <table class="quiniela-table">
+            <thead>
+                <tr>
+                    <th>#</th><th>Bonus</th><th>Cruce</th><th>Puntos</th>
+                </tr>
+            </thead>
+            <tbody>
+                {filas_insignias}
+            </tbody>
+            {footer_insignias}
+        </table>
+        """
+        altura_insignias = 280 + len(insignias_participante) * 44
+    else:
+        tabla_insignias = '<div class="empty-state">Este participante aún no ha participado en ningún bonus.</div>'
+        altura_insignias = 260
+
+    insignias_html = construir_tabla_detalle_html(
+        titulo="Insignias",
+        subtitulo="Bonus en los que participaste &middot; Puntos extra ganados",
+        tabla_bloque=tabla_insignias,
+        ocultar_columnas=["col-celda"],
+    )
+    st.components.v1.html(insignias_html, height=altura_insignias, scrolling=False)
+
     # ── Botón de regreso ──────────────────────────────────────────────
     col1, col2, col3 = st.columns([1, 1, 1])
     with col2:
@@ -1636,7 +1838,7 @@ if bonus_visible:
         st.markdown(
             f'<div class="bonus-subtitle">'
             f'{BONUS_FECHA} · {BONUS_HORA_INICIO} – {BONUS_HORA_FIN} CDMX\n'
-            f'Este bonus vale 5 puntos extra, Aplica para goles y pase de país a siguiete ronda\n'
+            f'Este bonus vale 3 puntos extra, Aplica para goles y pase de país a siguiete ronda\n'
             f'</div>',
             unsafe_allow_html=True,
         )
@@ -1771,7 +1973,7 @@ if bonus_visible:
 
         elif _bonus_cerrado:
             st.markdown(
-                '<div class="bonus-cerrado">🔴 El tiempo de este bonus ha cerrado.</div>',
+                '<div class="bonus-cerrado">🔴 El tiempo de este bonus ha cerrado. Se abriran mas bonuses en el futuro. Atentos!!</div>',
                 unsafe_allow_html=True,
             )
 
@@ -1784,7 +1986,17 @@ participantes = obtener_participantes()
 
 if participantes:
     todos_registros = obtener_todos_los_registros()
+    registros_bonus = obtener_registros_bonus()
     aciertos_por_participante = calcular_aciertos_por_participante(todos_registros)
+    puntos_bonus_por_participante, _detalle_bonus_por_participante = calcular_puntos_bonus_todos(
+        registros_bonus, todos_registros
+    )
+
+    # Los puntos de bonus se suman al total de aciertos de cada participante
+    for _nombre_bonus, _pts_bonus in puntos_bonus_por_participante.items():
+        aciertos_por_participante[_nombre_bonus] = (
+            aciertos_por_participante.get(_nombre_bonus, 0) + _pts_bonus
+        )
 
     participantes_ordenados = sorted(
         participantes,
