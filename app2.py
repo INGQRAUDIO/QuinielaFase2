@@ -251,6 +251,7 @@ madre_r16_flags = {
     "C11": ("us.svg", "Estados Unidos"),
     "C10": ("es.svg", "España"),
     "C9": ("pt.svg", "Portugal"),
+    "D11": ("ch.svg", "Suiza")
 }
 madre_qf_flags = {}
 madre_sf_flags = {}
