@@ -1725,7 +1725,7 @@ if participante_seleccionado:
         """
         altura_insignias = 280 + len(insignias_participante) * 44
     else:
-        tabla_insignias = '<div class="empty-state">Este participante aún no ha participado en ningún bonus.</div>'
+        tabla_insignias = '<div class="empty-state">Este participante aún no se ha registrado en ningún bonus.</div>'
         altura_insignias = 260
 
     insignias_html = construir_tabla_detalle_html(
