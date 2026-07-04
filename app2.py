@@ -124,18 +124,26 @@ def calcular_aciertos_por_participante(rows):
     aciertos_dict = {}
     claves_r16_set = set(r16_key_map.values())
     claves_r32_set = set(mapeo_circulo_a_indice.values())
+    claves_qf_set  = set(qf_key_map.values())
 
     for nombre, rows_participante in participantes_rows.items():
-        aciertos_octavos = 0
-        aciertos_goles = 0
+        total = 0
         for row in rows_participante:
             celda = (row.get("celda") or "").strip()
-            if celda in claves_r16_set:
-                pais_hijo = row.get("pais", "").strip()
+
+            # ── "¿Quién pasa?" (país) ──────────────────────────────────
+            # Aplica a las celdas de Octavos ("Quién pasa a Octavos?")
+            # y a las de Cuartos ("Quién pasa a Cuartos?")
+            if celda in claves_r16_set or celda in claves_qf_set:
+                pais_hijo = (row.get("pais") or "").strip()
                 pais_madre = resultados_madre_por_celda.get(celda)
                 if pais_madre and pais_hijo == pais_madre:
-                    aciertos_octavos += 1
-            elif celda in claves_r32_set:
+                    total += 1
+
+            # ── Goles ───────────────────────────────────────────────────
+            # Aplica a las celdas de Dieciseisavos ("Goles Dieciseisavos")
+            # y a las de Octavos ("Goles Octavos")
+            if celda in claves_r32_set or celda in claves_r16_set:
                 goles_hijo = row.get("goles")
                 if goles_hijo is None:
                     goles_hijo = ""
@@ -145,10 +153,10 @@ def calcular_aciertos_por_participante(rows):
                 if goles_madre is not None and goles_madre != "":
                     try:
                         if int(goles_hijo) == int(goles_madre):
-                            aciertos_goles += 1
+                            total += 1
                     except (ValueError, TypeError):
                         pass
-        total = aciertos_octavos + aciertos_goles
+
         aciertos_dict[nombre] = total
     return aciertos_dict
 
@@ -396,8 +404,12 @@ madre_r16_flags = {
     "C9": ("pt.svg", "Portugal"),
     "D11": ("ch.svg", "Suiza"),
     "D10": ("eg.svg", "Egipto"),
+    "D9": ("ar.svg", "Argentina"),
+    "D12": ("co.svg", "Colombia")
 }
-madre_qf_flags = {}
+madre_qf_flags = {
+    
+}
 madre_sf_flags = {}
 madre_final_flags = {}
 madre_champion_flags = {}
@@ -418,8 +430,12 @@ goles_madre_r32 = {
     "C1": 1, "C5": 2,
     "D3": 2, "D7": 0,
     "D2": 3, "D6": 5,
+    "D1": 3, "D5": 2,
+    "D4": 0, "D8": 1
 }
-goles_madre_r16 = {}
+goles_madre_r16 = {
+
+}
 goles_madre_qf = {}
 goles_madre_sf = {}
 goles_madre_final = {}
@@ -986,6 +1002,169 @@ wireTooltip('.champion-node', championNames, true);
 # ════════════════════════════════════════════════════════════════════
 #  FUNCIÓN REUTILIZABLE: tabla de resultados con el diseño estándar
 # ════════════════════════════════════════════════════════════════════
+
+def construir_tabla_acordeon_html(titulo, subtitulo, tabla_bloque, ocultar_columnas=None):
+    """Igual que construir_tabla_detalle_html pero con toggle de acordeón.
+    La tabla arranca colapsada; al hacer clic en el título se expande/colapsa."""
+    ocultar_columnas = ocultar_columnas or []
+    ocultar_css = "\n".join(
+        f"      th.{clase}, td.{clase} {{ display: none !important; }}"
+        for clase in ocultar_columnas
+    )
+    return f"""<!DOCTYPE html>
+    <html>
+    <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+    <style>
+      * {{ margin:0; padding:0; box-sizing:border-box; }}
+      body {{
+        background: #0a0a0a;
+        font-family: 'Georgia', serif;
+        display: flex;
+        justify-content: center;
+        padding: 10px 20px 20px 20px;
+      }}
+      .page-wrap {{
+        position: relative;
+        width: 100%;
+        max-width: 760px;
+      }}
+      /* ── Cabecera acordeón ── */
+      .acordeon-header {{
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        cursor: pointer;
+        user-select: none;
+        padding: 14px 20px;
+        background: linear-gradient(180deg, #1a1508 0%, #110d04 100%);
+        border: 1px solid #3a2e10;
+        border-radius: 10px;
+        transition: border-color 0.2s;
+      }}
+      .acordeon-header:hover {{ border-color: #c8a84b; }}
+      .acordeon-header h2 {{
+        text-align: center;
+        color: #d4a843;
+        font-family: 'Georgia', serif;
+        font-weight: normal;
+        letter-spacing: 4px;
+        font-size: 16px;
+        text-transform: uppercase;
+        margin: 0;
+      }}
+      .acordeon-arrow {{
+        color: #7a6535;
+        font-size: 14px;
+        transition: transform 0.25s;
+        flex-shrink: 0;
+      }}
+      .acordeon-arrow.open {{ transform: rotate(180deg); }}
+      /* ── Contenido colapsable ── */
+      .acordeon-body {{
+        overflow: hidden;
+        max-height: 0;
+        transition: max-height 0.35s ease;
+      }}
+      .acordeon-body.open {{ max-height: 9999px; }}
+      .subtitle {{
+        text-align: center;
+        color: #7a6535;
+        font-family: monospace;
+        font-size: 10px;
+        letter-spacing: 2px;
+        margin: 10px 0 14px 0;
+        text-transform: uppercase;
+      }}
+      .divider {{
+        width: 100px;
+        height: 1px;
+        background: linear-gradient(90deg, transparent, #c8a84b, transparent);
+        margin: 0 auto 18px auto;
+      }}
+      /* ── Tabla ── */
+      .quiniela-table {{
+        width: 100%;
+        border-collapse: collapse;
+        background: rgba(20,15,5,.5);
+        border: 1px solid #3a2e10;
+        border-radius: 10px;
+        overflow: hidden;
+      }}
+      .quiniela-table thead th {{
+        background: linear-gradient(180deg, #1a1508, #110d04);
+        color: #e8d080;
+        font-family: monospace;
+        font-size: 11px;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        padding: 14px 10px;
+        border-bottom: 1px solid #c8a84b;
+        text-align: center;
+        font-weight: normal;
+      }}
+      .quiniela-row td {{
+        padding: 11px 10px;
+        text-align: center;
+        color: #d8cba8;
+        font-family: monospace;
+        font-size: 13px;
+        border-bottom: 1px solid #221a0a;
+        transition: background .15s;
+      }}
+      .quiniela-row:hover td {{ background: rgba(200,168,75,.08); color: #f0d060; }}
+      .quiniela-row:last-child td {{ border-bottom: none; }}
+      .quiniela-footer td {{
+        padding: 10px;
+        font-family: monospace;
+        font-size: 12px;
+        background: linear-gradient(180deg, #1a1508, #110d04);
+        border-top: 1px solid #c8a84b;
+      }}
+      .footer-label {{ color: #7a6535; text-align: right !important; letter-spacing: 1px; }}
+      .footer-valor  {{ color: #d4a843; font-weight: bold; font-size: 14px; }}
+      .col-num       {{ color: #7a6535; width: 6%; }}
+      .col-celda     {{ width: 12%; }}
+      .col-pais      {{ width: 38%; text-align: left !important; padding-left: 18px !important; }}
+      .col-goles     {{ color: #c8a84b; font-weight: bold; width: 12%; }}
+      .col-goles-madre {{ color: #d4a843; width: 12%; }}
+      .col-comparacion {{ width: 18%; }}
+      .col-estado    {{ width: 18%; }}
+      .madre-ref     {{ color: #6a5528; font-size: 11px; }}
+      .badge-ok      {{ color:#3ddc6e; border:1px solid #2a8a4a; background:rgba(61,220,110,.08); border-radius:6px; padding:2px 8px; font-size:11px; }}
+      .badge-fail    {{ color:#e0473e; border:1px solid #8a2a24; background:rgba(224,71,62,.08);  border-radius:6px; padding:2px 8px; font-size:11px; }}
+      .empty-state   {{ text-align:center; color:#7a6535; font-family:monospace; font-size:13px; padding:50px 20px; border:1px dashed #3a2e10; border-radius:10px; }}
+      {ocultar_css}
+    </style>
+    </head>
+    <body>
+      <div class="page-wrap">
+        <div class="acordeon-header" onclick="toggleAcordeon()">
+          <span class="acordeon-arrow" id="arrow">▼</span>
+          <h2>{titulo}</h2>
+          <span class="acordeon-arrow" id="arrow2">▼</span>
+        </div>
+        <div class="acordeon-body" id="body">
+          <div class="subtitle" style="margin-top:14px;">{subtitulo}</div>
+          <div class="divider"></div>
+          {tabla_bloque}
+        </div>
+      </div>
+      <script>
+        function toggleAcordeon() {{
+          const body  = document.getElementById('body');
+          const arr1  = document.getElementById('arrow');
+          const arr2  = document.getElementById('arrow2');
+          const open  = body.classList.toggle('open');
+          arr1.classList.toggle('open', open);
+          arr2.classList.toggle('open', open);
+        }}
+      </script>
+    </body>
+    </html>"""
+
+
 def construir_tabla_detalle_html(titulo, subtitulo, tabla_bloque, ocultar_columnas=None):
     ocultar_columnas = ocultar_columnas or []
     ocultar_css = "\n".join(
@@ -1292,78 +1471,18 @@ if participante_seleccionado:
 
     components.html(bracket_html, height=SVG_HEIGHT + 60, scrolling=False)
 
-    # ── TABLA "OCTAVOS" ──────────────────────────────────────────────
-    if datos:
-        datos_r16 = [
-            row for row in datos
-            if (row.get("celda", "") or "").strip() in claves_r16
-        ]
-        datos_r16_ordenados = sorted(datos_r16, key=lambda x: x["celda"])
-        filas_octavos = ""
-        total_aciertos_r16 = 0
-        total_con_resultado_r16 = 0
-        for i, row in enumerate(datos_r16_ordenados, start=1):
-            celda = row.get("celda", "")
-            pais = row.get("pais", "")
+    # ════════════════════════════════════════════════════════════════
+    #  ORDEN DE TABLAS EN STATS DE PARTICIPANTE:
+    #  1. Rueda (ya renderizada arriba)
+    #  2. QUIEN PASA A CUARTOS?      ← nueva
+    #  3. GOLES OCTAVOS              ← nueva
+    #  4. QUIEN PASA A OCTAVOS?      ← existente (con acordeón)
+    #  5. GOLES DIECISEISAVOS        ← existente (con acordeón)
+    #  6. INSIGNIAS
+    #  7. Botón volver
+    # ════════════════════════════════════════════════════════════════
 
-            estado_html = ""
-            pais_madre = resultados_madre_por_celda.get(celda)
-            if pais_madre:
-                total_con_resultado_r16 += 1
-                if pais.strip() == pais_madre.strip():
-                    estado_html = '<span class="badge-ok">✓ Acierto</span>'
-                    total_aciertos_r16 += 1
-                else:
-                    estado_html = '<span class="badge-fail">✗ Falló</span>'
-                pais_html = f'{pais} <span class="madre-ref">(real: {pais_madre})</span>'
-            else:
-                pais_html = pais
-
-            filas_octavos += f"""
-            <tr class="quiniela-row">
-                <td class="col-num">{i}</td>
-                <td class="col-celda">{celda}</td>
-                <td class="col-pais">{pais_html}</td>
-                <td class="col-estado">{estado_html}</td>
-            </tr>
-            """
-        num_filas_r16 = len(datos_r16_ordenados)
-
-        footer_octavos = f"""
-        <tfoot>
-            <tr class="quiniela-footer">
-                <td colspan="3" class="footer-label">Total de aciertos</td>
-                <td class="footer-valor">{total_aciertos_r16}/{total_con_resultado_r16}</td>
-            </tr>
-        </tfoot>
-        """ if num_filas_r16 > 0 else ""
-
-        tabla_octavos = f"""
-        <table class="quiniela-table">
-            <thead>
-                <tr>
-                    <th>#</th><th class="col-celda">Celda</th><th>País</th><th>Estado</th>
-                </tr>
-            </thead>
-            <tbody>
-                {filas_octavos}
-            </tbody>
-            {footer_octavos}
-        </table>
-        """
-        altura_octavos = 280 + num_filas_r16 * 44
-    else:
-        tabla_octavos = '<div class="empty-state">No se encontraron datos para este participante.</div>'
-        altura_octavos = 260
-
-    octavos_html = construir_tabla_detalle_html(
-        titulo="QUIEN PASA A Octavos?",
-        subtitulo="Verde = acierto vs. resultado real &middot; Rojo = no coincide",
-        tabla_bloque=tabla_octavos,
-    )
-    st.components.v1.html(octavos_html, height=altura_octavos, scrolling=False)
-
-    # ── TABLA "GOLES DIECISEISAVOS" ───────────────────────────────────
+    # ── Helper reutilizable de comparar goles ────────────────────────
     def comparar_goles(goles_p, goles_r):
         if goles_r is None or goles_r == "":
             return '<span class="madre-ref">Pendiente</span>', False, False
@@ -1376,77 +1495,187 @@ if participante_seleccionado:
             return '<span class="badge-ok">✓ Acierto!</span>', True, True
         return '<span class="badge-fail">✗ Falló</span>', True, False
 
-    if datos:
-        datos_r32 = [
-            row for row in datos
-            if (row.get("celda", "") or "").strip() in claves_r32
-        ]
-        datos_r32_ordenados = sorted(datos_r32, key=lambda x: x["celda"])
-        filas_goles = ""
-        total_aciertos_goles = 0
-        total_con_resultado_goles = 0
-        for i, row in enumerate(datos_r32_ordenados, start=1):
-            celda = row.get("celda", "")
-            pais = row.get("pais", "")
-            goles_p = row.get("goles", "0")
-            goles_r = goles_madre_por_celda.get(celda)
-            goles_r_html = (
-                goles_r if goles_r is not None and goles_r != ""
-                else '<span class="madre-ref">—</span>'
-            )
-
-            comparacion_html, cuenta, acerto = comparar_goles(goles_p, goles_r)
-            if cuenta:
-                total_con_resultado_goles += 1
-                if acerto:
-                    total_aciertos_goles += 1
-
-            filas_goles += f"""
-            <tr class="quiniela-row">
-                <td class="col-num">{i}</td>
-                <td class="col-celda">{celda}</td>
-                <td class="col-pais">{pais}</td>
-                <td class="col-goles">{goles_p}</td>
-                <td class="col-goles-madre">{goles_r_html}</td>
-                <td class="col-comparacion">{comparacion_html}</td>
-            </tr>
-            """
-        num_filas_goles = len(datos_r32_ordenados)
-
-        footer_goles = f"""
-        <tfoot>
-            <tr class="quiniela-footer">
-                <td colspan="4" class="footer-label">Total de aciertos</td>
-                <td class="footer-valor">{total_aciertos_goles}/{total_con_resultado_goles}</td>
-            </tr>
-        </tfoot>
-        """ if num_filas_goles > 0 else ""
-
-        tabla_goles = f"""
-        <table class="quiniela-table">
-            <thead>
-                <tr>
-                    <th>#</th><th class="col-celda">Celda</th><th>País</th><th>Goles P</th><th>Goles R</th><th>Comparación</th>
-                </tr>
-            </thead>
-            <tbody>
-                {filas_goles}
-            </tbody>
-            {footer_goles}
-        </table>
+    # ── Helper que construye una tabla de aciertos de PAÍS ───────────
+    def _tabla_pais(filas_data, clave_set, titulo_tabla, subtitulo_tabla,
+                    resultados_ref, altura_base=280, acordeon=False):
         """
-        altura_goles = 280 + num_filas_goles * 44
-    else:
-        tabla_goles = '<div class="empty-state">No se encontraron datos para este participante.</div>'
-        altura_goles = 260
+        filas_data     : lista completa de rows del participante
+        clave_set      : conjunto de celdas que se filtran (ej claves_qf)
+        resultados_ref : dict {celda: pais_real} para la comparación
+        acordeon       : si True devuelve HTML con toggle estilo acordeón
+        """
+        if filas_data:
+            filtradas = sorted(
+                [r for r in filas_data
+                 if (r.get("celda", "") or "").strip() in clave_set],
+                key=lambda x: x["celda"],
+            )
+            filas_html = ""
+            total_ac, total_con = 0, 0
+            for i, row in enumerate(filtradas, start=1):
+                celda = row.get("celda", "")
+                pais  = row.get("pais", "")
+                pais_madre = resultados_ref.get(celda)
+                if pais_madre:
+                    total_con += 1
+                    if pais.strip() == pais_madre.strip():
+                        est = '<span class="badge-ok">✓ Acierto</span>'
+                        total_ac += 1
+                    else:
+                        est = '<span class="badge-fail">✗ Falló</span>'
+                    p_html = f'{pais} <span class="madre-ref">(real: {pais_madre})</span>'
+                else:
+                    est, p_html = "", pais
+                filas_html += f"""
+                <tr class="quiniela-row">
+                    <td class="col-num">{i}</td>
+                    <td class="col-celda">{celda}</td>
+                    <td class="col-pais">{p_html}</td>
+                    <td class="col-estado">{est}</td>
+                </tr>"""
+            n = len(filtradas)
+            footer = (
+                f'<tfoot><tr class="quiniela-footer">'
+                f'<td colspan="3" class="footer-label">Total de aciertos</td>'
+                f'<td class="footer-valor">{total_ac}/{total_con}</td>'
+                f'</tr></tfoot>'
+            ) if n > 0 else ""
+            tabla_bloque = f"""
+            <table class="quiniela-table">
+                <thead><tr>
+                    <th>#</th><th class="col-celda">Celda</th>
+                    <th>País</th><th>Estado</th>
+                </tr></thead>
+                <tbody>{filas_html}</tbody>
+                {footer}
+            </table>"""
+            altura = altura_base + n * 44
+        else:
+            tabla_bloque = '<div class="empty-state">Sin datos.</div>'
+            altura = 260
 
-    goles_dieciseisavos_html = construir_tabla_detalle_html(
-        titulo="Goles Dieciseisavos",
-        subtitulo="Verde = goles exactos &middot; Rojo = no coincide",
-        tabla_bloque=tabla_goles,
-        ocultar_columnas=["col-celda"],
+        if acordeon:
+            html = construir_tabla_acordeon_html(titulo_tabla, subtitulo_tabla, tabla_bloque)
+        else:
+            html = construir_tabla_detalle_html(titulo_tabla, subtitulo_tabla, tabla_bloque)
+        return html, altura
+
+    # ── Helper que construye una tabla de aciertos de GOLES ──────────
+    def _tabla_goles(filas_data, clave_set, goles_ref,
+                     titulo_tabla, subtitulo_tabla,
+                     altura_base=280, acordeon=False):
+        if filas_data:
+            filtradas = sorted(
+                [r for r in filas_data
+                 if (r.get("celda", "") or "").strip() in clave_set],
+                key=lambda x: x["celda"],
+            )
+            filas_html = ""
+            total_ac, total_con = 0, 0
+            for i, row in enumerate(filtradas, start=1):
+                celda   = row.get("celda", "")
+                pais    = row.get("pais", "")
+                goles_p = row.get("goles", "0")
+                goles_r = goles_ref.get(celda)
+                goles_r_html = (
+                    goles_r if goles_r is not None and goles_r != ""
+                    else '<span class="madre-ref">—</span>'
+                )
+                comp_html, cuenta, acerto = comparar_goles(goles_p, goles_r)
+                if cuenta:
+                    total_con += 1
+                    if acerto:
+                        total_ac += 1
+                filas_html += f"""
+                <tr class="quiniela-row">
+                    <td class="col-num">{i}</td>
+                    <td class="col-celda">{celda}</td>
+                    <td class="col-pais">{pais}</td>
+                    <td class="col-goles">{goles_p}</td>
+                    <td class="col-goles-madre">{goles_r_html}</td>
+                    <td class="col-comparacion">{comp_html}</td>
+                </tr>"""
+            n = len(filtradas)
+            footer = (
+                f'<tfoot><tr class="quiniela-footer">'
+                f'<td colspan="4" class="footer-label">Total de aciertos</td>'
+                f'<td class="footer-valor">{total_ac}/{total_con}</td>'
+                f'</tr></tfoot>'
+            ) if n > 0 else ""
+            tabla_bloque = f"""
+            <table class="quiniela-table">
+                <thead><tr>
+                    <th>#</th><th class="col-celda">Celda</th>
+                    <th>País</th><th>Goles P</th><th>Goles R</th>
+                    <th>Comparación</th>
+                </tr></thead>
+                <tbody>{filas_html}</tbody>
+                {footer}
+            </table>"""
+            altura = altura_base + n * 44
+        else:
+            tabla_bloque = '<div class="empty-state">Sin datos.</div>'
+            altura = 260
+
+        if acordeon:
+            html = construir_tabla_acordeon_html(titulo_tabla, subtitulo_tabla, tabla_bloque,
+                                                  ocultar_columnas=["col-celda"])
+        else:
+            html = construir_tabla_detalle_html(titulo_tabla, subtitulo_tabla, tabla_bloque,
+                                                ocultar_columnas=["col-celda"])
+        return html, altura
+
+    # ════════════════════════════════════════════════════════════════
+    #  TABLA "QUIEN PASA A CUARTOS?" — AQUI ESTA LA TABLA DE QUIEN PASA A CUARTOS
+    # ════════════════════════════════════════════════════════════════
+    html_cuartos, alt_cuartos = _tabla_pais(
+        filas_data=datos,
+        clave_set=claves_qf,                  # ← compara con madre_qf_flags
+        titulo_tabla="¿QUIÉN PASA A CUARTOS?",
+        subtitulo_tabla="Verde = acierto vs. resultado real &middot; Rojo = no coincide",
+        resultados_ref=resultados_madre_por_celda,
+        acordeon=False,
     )
-    st.components.v1.html(goles_dieciseisavos_html, height=altura_goles, scrolling=False)
+    st.components.v1.html(html_cuartos, height=alt_cuartos, scrolling=False)
+
+    # ════════════════════════════════════════════════════════════════
+    #  TABLA "GOLES OCTAVOS"
+    # ════════════════════════════════════════════════════════════════
+    html_goles_octavos, alt_goles_octavos = _tabla_goles(
+        filas_data=datos,
+        clave_set=claves_r16,                 # ← celdas R16 (B9, B10…)
+        goles_ref=goles_madre_r16,            # ← compara con goles_madre_r16
+        titulo_tabla="GOLES OCTAVOS",
+        subtitulo_tabla="Verde = goles exactos &middot; Rojo = no coincide",
+        acordeon=False,
+    )
+    st.components.v1.html(html_goles_octavos, height=alt_goles_octavos, scrolling=False)
+
+    # ════════════════════════════════════════════════════════════════
+    #  TABLA "QUIEN PASA A OCTAVOS?" — con acordeón (colapsada por defecto)
+    # ════════════════════════════════════════════════════════════════
+    html_octavos, alt_octavos = _tabla_pais(
+        filas_data=datos,
+        clave_set=claves_r16,                 # ← compara con madre_r16_flags
+        titulo_tabla="¿QUIÉN PASA A OCTAVOS?",
+        subtitulo_tabla="Verde = acierto vs. resultado real &middot; Rojo = no coincide",
+        resultados_ref=resultados_madre_por_celda,
+        acordeon=False,                        # ← toggle acordeón
+    )
+    st.components.v1.html(html_octavos, height=alt_octavos + 60, scrolling=False)
+
+    # ════════════════════════════════════════════════════════════════
+    #  TABLA "GOLES DIECISEISAVOS" — con acordeón (colapsada por defecto)
+    # ════════════════════════════════════════════════════════════════
+    html_goles_16, alt_goles_16 = _tabla_goles(
+        filas_data=datos,
+        clave_set=claves_r32,                 # ← celdas R32
+        goles_ref={k: v for d in [goles_madre_r32] for k, v in d.items()},
+        titulo_tabla="GOLES DIECISEISAVOS",
+        subtitulo_tabla="Verde = goles exactos &middot; Rojo = no coincide",
+        acordeon=False,                        # ← toggle acordeón
+    )
+    st.components.v1.html(html_goles_16, height=alt_goles_16 + 60, scrolling=False)
 
     # ── TABLA "INSIGNIAS" (bonus en los que participó) ─────────────────
     _registros_bonus_todos = obtener_registros_bonus()
