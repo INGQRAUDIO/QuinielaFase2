@@ -140,10 +140,10 @@ def calcular_aciertos_por_participante(rows):
                 if pais_madre and pais_hijo == pais_madre:
                     total += 1
 
-            # ── Goles ───────────────────────────────────────────────────
-            # Aplica a las celdas de Dieciseisavos ("Goles Dieciseisavos")
-            # y a las de Octavos ("Goles Octavos")
-            if celda in claves_r32_set or celda in claves_r16_set:
+            # ── Goles Dieciseisavos ─────────────────────────────────────
+            # Los equipos de esta ronda ya son fijos (herencia_fija),
+            # así que solo se compara el número de goles.
+            if celda in claves_r32_set:
                 goles_hijo = row.get("goles")
                 if goles_hijo is None:
                     goles_hijo = ""
@@ -153,6 +153,30 @@ def calcular_aciertos_por_participante(rows):
                 if goles_madre is not None and goles_madre != "":
                     try:
                         if int(goles_hijo) == int(goles_madre):
+                            total += 1
+                    except (ValueError, TypeError):
+                        pass
+
+            # ── Goles Octavos ───────────────────────────────────────────
+            # Aquí el equipo de la celda depende de quién ganó Dieciseisavos,
+            # así que el acierto solo cuenta si, ADEMÁS de coincidir los
+            # goles, el país predicho es realmente el que avanzó según
+            # madre_r16_flags (si no, aunque los goles coincidan por
+            # casualidad, no se otorga el punto).
+            if celda in claves_r16_set:
+                goles_hijo = row.get("goles")
+                if goles_hijo is None:
+                    goles_hijo = ""
+                else:
+                    goles_hijo = str(goles_hijo).strip()
+                goles_madre = goles_madre_por_celda.get(celda)
+                if goles_madre is not None and goles_madre != "":
+                    pais_real_info = madre_r16_flags.get(celda)
+                    pais_real = pais_real_info[1] if pais_real_info else None
+                    pais_hijo = (row.get("pais") or "").strip()
+                    try:
+                        if (pais_real and pais_hijo == pais_real
+                                and int(goles_hijo) == int(goles_madre)):
                             total += 1
                     except (ValueError, TypeError):
                         pass
@@ -408,6 +432,8 @@ madre_r16_flags = {
     "D12": ("co.svg", "Colombia")
 }
 madre_qf_flags = {
+    "A13": ("fr.svg", "Francia"),
+    "A14": ("ma.svg", "Marruecos"),
     
 }
 madre_sf_flags = {}
@@ -434,6 +460,9 @@ goles_madre_r32 = {
     "D4": 0, "D8": 1
 }
 goles_madre_r16 = {
+    
+    "A11": 2, "A12": 0,
+    "A9": 0, "A10": 1,
 
 }
 goles_madre_qf = {}
@@ -1483,7 +1512,14 @@ if participante_seleccionado:
     # ════════════════════════════════════════════════════════════════
 
     # ── Helper reutilizable de comparar goles ────────────────────────
-    def comparar_goles(goles_p, goles_r):
+    def comparar_goles(goles_p, goles_r, pais_p=None, pais_real=None):
+        """
+        Compara la predicción de goles contra el resultado real.
+        Si se pasan pais_p/pais_real (validación extra, usada en "Goles
+        Octavos"), el acierto solo se otorga si, ADEMÁS de coincidir los
+        goles, el país predicho es el que realmente avanzó. Si no,
+        simplemente se marca como Falló (sin ningún detalle adicional).
+        """
         if goles_r is None or goles_r == "":
             return '<span class="madre-ref">Pendiente</span>', False, False
         try:
@@ -1491,7 +1527,15 @@ if participante_seleccionado:
             r_val = int(str(goles_r).strip())
         except (TypeError, ValueError):
             return '<span class="madre-ref">—</span>', False, False
-        if p_val == r_val:
+
+        goles_ok = (p_val == r_val)
+
+        if pais_real is not None:
+            if goles_ok and (pais_p or "").strip() == (pais_real or "").strip():
+                return '<span class="badge-ok">✓ Acierto!</span>', True, True
+            return '<span class="badge-fail">✗ Falló</span>', True, False
+
+        if goles_ok:
             return '<span class="badge-ok">✓ Acierto!</span>', True, True
         return '<span class="badge-fail">✗ Falló</span>', True, False
 
@@ -1563,7 +1607,14 @@ if participante_seleccionado:
     # ── Helper que construye una tabla de aciertos de GOLES ──────────
     def _tabla_goles(filas_data, clave_set, goles_ref,
                      titulo_tabla, subtitulo_tabla,
-                     altura_base=280, acordeon=False):
+                     altura_base=280, acordeon=False, validar_pais=None):
+        """
+        validar_pais : dict opcional {celda: pais_real}. Cuando se pasa
+        (usado en "Goles Octavos"), el acierto de goles solo se otorga
+        si el país predicho para esa celda coincide con el país real,
+        evitando falsos aciertos cuando el equipo predicho ni siquiera
+        avanzó realmente a esa ronda.
+        """
         if filas_data:
             filtradas = sorted(
                 [r for r in filas_data
@@ -1581,7 +1632,13 @@ if participante_seleccionado:
                     goles_r if goles_r is not None and goles_r != ""
                     else '<span class="madre-ref">—</span>'
                 )
-                comp_html, cuenta, acerto = comparar_goles(goles_p, goles_r)
+                if validar_pais is not None:
+                    comp_html, cuenta, acerto = comparar_goles(
+                        goles_p, goles_r,
+                        pais_p=pais, pais_real=validar_pais.get(celda),
+                    )
+                else:
+                    comp_html, cuenta, acerto = comparar_goles(goles_p, goles_r)
                 if cuenta:
                     total_con += 1
                     if acerto:
@@ -1648,6 +1705,7 @@ if participante_seleccionado:
         titulo_tabla="GOLES OCTAVOS",
         subtitulo_tabla="Verde = goles exactos &middot; Rojo = no coincide",
         acordeon=False,
+        validar_pais={celda: info[1] for celda, info in madre_r16_flags.items()},
     )
     st.components.v1.html(html_goles_octavos, height=alt_goles_octavos, scrolling=False)
 
