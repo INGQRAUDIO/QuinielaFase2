@@ -465,7 +465,7 @@ goles_madre_r16 = {
     "A11": 0, "A12": 3,
     "A9": 0, "A10": 1,
     "B9": 1, "B10": 2, 
-    "B11", 2, "B12": 3,
+    "B11": 2, "B12": 3,
 }
 goles_madre_qf = {}
 goles_madre_sf = {}
