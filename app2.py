@@ -33,7 +33,6 @@ _PAGE_ICON = _cargar_icono(_ICON_PATH) if os.path.exists(_ICON_PATH) else "🏆"
 # ─── Supabase ────────────────────────────────────────────────────────
 SUPABASE_URL = st.secrets["SUPABASE_URL"]
 SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
-
 @st.cache_data(ttl=0)
 def obtener_participantes():
     headers = {
@@ -188,17 +187,34 @@ def calcular_aciertos_por_participante(rows):
 # ════════════════════════════════════════════════════════════════════
 #  PUNTOS EXTRA DE BONUS
 # ════════════════════════════════════════════════════════════════════
-# Cada bonus está ligado a un cruce específico de Dieciseisavos (2 equipos).
-# Un participante que se registró en ese bonus (tabla BonusCheck) gana
-# PUNTOS_POR_ACIERTO_BONUS por cada acierto CORRECTO que tenía, de forma
-# independiente, en sus 3 predicciones relacionadas con ese cruce:
-#   1) "¿Quién pasa a Octavos?"      → celda de Octavos del cruce
-#   2) "Goles Dieciseisavos" equipo 1 → celda de goles del equipo 1
-#   3) "Goles Dieciseisavos" equipo 2 → celda de goles del equipo 2
-# Si acierta las 3, gana 3 × PUNTOS_POR_ACIERTO_BONUS puntos extra.
-# Estos puntos se basan en lo que el participante puso ORIGINALMENTE en su
-# quiniela (Quiniela_Fase2), no en la selección hecha dentro del panel de
-# bonus (esa selección solo sirve para registrar quién participa).
+# Cada bonus está ligado a un cruce de 2 equipos (tabla BonusCheck).
+# Ese cruce puede ocurrir en DOS niveles distintos del bracket, y el
+# nivel se DETECTA AUTOMÁTICAMENTE a partir de dónde se enfrentan
+# realmente esos 2 equipos entre sí (ver _celdas_bonus_desde_equipos):
+#
+#   • Nivel "r32" (rivales de Dieciseisavos, ej. Bonus 1: Argelia vs Suiza)
+#     Se usan SOLO estas tablas:
+#       1) "¿Quién pasa a Octavos?"   → celda de Octavos del cruce (r16_key_map)
+#       2) "Goles Dieciseisavos" eq.1 → celda fija de Dieciseisavos (herencia_fija)
+#       3) "Goles Dieciseisavos" eq.2 → celda fija de Dieciseisavos (herencia_fija)
+#
+#   • Nivel "r16" (rivales de Octavos, ej. Bonus 2: Argentina vs Egipto)
+#     Se usan SOLO estas tablas:
+#       1) "¿Quién pasa a Cuartos?" → celda de Cuartos del cruce (qf_key_map)
+#       2) "Goles Octavos" eq.1     → celda de Octavos del eq.1 (r16_key_map)
+#       3) "Goles Octavos" eq.2     → celda de Octavos del eq.2 (r16_key_map)
+#
+# Un participante registrado en ese bonus (tabla BonusCheck) gana
+# PUNTOS_POR_ACIERTO_BONUS por cada acierto CORRECTO, de forma
+# independiente, en esas 3 predicciones. Si acierta las 3, gana
+# 3 × PUNTOS_POR_ACIERTO_BONUS puntos extra.
+# Estos puntos se basan en lo que el participante puso ORIGINALMENTE en
+# su quiniela (Quiniela_Fase2), no en la selección hecha dentro del
+# panel de bonus (esa selección solo sirve para registrar quién participa).
+#
+# IMPORTANTE: nunca se mezclan tablas de ambos niveles para un mismo
+# bonus — cada cruce usa EXCLUSIVAMENTE las 3 tablas de su propio nivel,
+# detectado según en qué ronda se enfrentan realmente esos 2 equipos.
 # ─────────────────────────────────────────────────────────────────────
 PUNTOS_POR_ACIERTO_BONUS = 3
 
@@ -231,22 +247,60 @@ def obtener_registros_bonus():
 
 def _celdas_bonus_desde_equipos(codigo_eq1, codigo_eq2):
     """A partir de los códigos de bandera de los 2 equipos de un cruce de
-    Dieciseisavos, calcula automáticamente las celdas involucradas:
-      - celda_eq1 / celda_eq2 → celdas de "Goles Dieciseisavos" de cada equipo
-      - celda_r16             → celda de "¿Quién pasa a Octavos?" de ese cruce
+    bonus, DETECTA AUTOMÁTICAMENTE en qué ronda se enfrentan entre sí y
+    devuelve las celdas correspondientes para calificarlo.
+
+    Devuelve (nivel, celda_eq1, celda_eq2, celda_avance):
+
+      • nivel == "r32"  → son rivales de DIECISEISAVOS (su cruce original
+        de grupo es uno contra el otro, ej. Argelia vs Suiza).
+          celda_eq1/celda_eq2 → celdas fijas de Dieciseisavos (herencia_fija),
+                                 usadas para "Goles Dieciseisavos"
+          celda_avance        → celda de Octavos (r16_key_map), usada para
+                                 "¿Quién pasa a Octavos?"
+
+      • nivel == "r16"  → son rivales de OCTAVOS (cada uno avanzó por su
+        lado desde Dieciseisavos y se enfrentan en Octavos, ej. Argentina
+        vs Egipto).
+          celda_eq1/celda_eq2 → celdas de Octavos (madre_r16_flags), usadas
+                                 para "Goles Octavos"
+          celda_avance        → celda de Cuartos (qf_key_map), usada para
+                                 "¿Quién pasa a Cuartos?"
+
+      • nivel is None   → no se pudo determinar que esos 2 equipos se
+        enfrenten entre sí en ninguno de los dos niveles conocidos.
     """
-    celda_eq1 = next(
+    # ── Intento 1: ¿son rivales de Dieciseisavos? ──────────────────────
+    celda_eq1_r32 = next(
         (c for c, archivo in herencia_fija.items() if archivo == f"{codigo_eq1}.svg"), None
     )
-    celda_eq2 = next(
+    celda_eq2_r32 = next(
         (c for c, archivo in herencia_fija.items() if archivo == f"{codigo_eq2}.svg"), None
     )
-    celda_r16 = None
-    _index_por_celda = {v: k for k, v in mapeo_circulo_a_indice.items()}
-    if celda_eq1 in _index_por_celda and celda_eq2 in _index_por_celda:
-        idx_par = _index_por_celda[celda_eq1] // 2
-        celda_r16 = r16_key_map.get(idx_par)
-    return celda_eq1, celda_eq2, celda_r16
+    _index_r32 = {v: k for k, v in mapeo_circulo_a_indice.items()}
+    if celda_eq1_r32 in _index_r32 and celda_eq2_r32 in _index_r32:
+        idx1, idx2 = _index_r32[celda_eq1_r32], _index_r32[celda_eq2_r32]
+        if idx1 // 2 == idx2 // 2:
+            celda_r16 = r16_key_map.get(idx1 // 2)
+            return "r32", celda_eq1_r32, celda_eq2_r32, celda_r16
+
+    # ── Intento 2: ¿son rivales de Octavos? ─────────────────────────────
+    celda_eq1_r16 = next(
+        (c for c, (archivo, _p) in madre_r16_flags.items() if archivo == f"{codigo_eq1}.svg"),
+        None,
+    )
+    celda_eq2_r16 = next(
+        (c for c, (archivo, _p) in madre_r16_flags.items() if archivo == f"{codigo_eq2}.svg"),
+        None,
+    )
+    _index_r16 = {v: k for k, v in r16_key_map.items()}
+    if celda_eq1_r16 in _index_r16 and celda_eq2_r16 in _index_r16:
+        idx1, idx2 = _index_r16[celda_eq1_r16], _index_r16[celda_eq2_r16]
+        if idx1 // 2 == idx2 // 2:
+            celda_qf = qf_key_map.get(idx1 // 2)
+            return "r16", celda_eq1_r16, celda_eq2_r16, celda_qf
+
+    return None, None, None, None
 
 
 def calcular_puntos_bonus_todos(registros_bonus, todos_los_registros):
@@ -280,39 +334,63 @@ def calcular_puntos_bonus_todos(registros_bonus, todos_los_registros):
     for (bonus_number, pais1, pais2), nombres in bonus_grupos.items():
         codigo_eq1 = country_to_flag.get(pais1)
         codigo_eq2 = country_to_flag.get(pais2)
-        celda_eq1 = celda_eq2 = celda_r16 = None
+        nivel = celda_eq1 = celda_eq2 = celda_avance = None
         if codigo_eq1 and codigo_eq2:
-            celda_eq1, celda_eq2, celda_r16 = _celdas_bonus_desde_equipos(codigo_eq1, codigo_eq2)
+            nivel, celda_eq1, celda_eq2, celda_avance = _celdas_bonus_desde_equipos(codigo_eq1, codigo_eq2)
 
-        pais_real_r16  = resultados_madre_por_celda.get(celda_r16) if celda_r16 else None
+        # "¿Quién pasa a Octavos/Cuartos?" — solo cuenta si ya hay
+        # resultado real cargado en esa celda de avance.
+        pais_real_avance = resultados_madre_por_celda.get(celda_avance) if celda_avance else None
+
         goles_real_eq1 = goles_madre_por_celda.get(celda_eq1) if celda_eq1 else None
         goles_real_eq2 = goles_madre_por_celda.get(celda_eq2) if celda_eq2 else None
+
+        # Solo en nivel "r16" (Goles Octavos) el equipo de la celda depende
+        # de quién ganó Dieciseisavos, así que el acierto de goles exige
+        # ADEMÁS que el país predicho sea el que realmente llegó ahí
+        # (igual criterio que calcular_aciertos_por_participante). En
+        # nivel "r32" (Goles Dieciseisavos) el equipo ya es fijo y este
+        # requisito extra no aplica.
+        pais_real_eq1 = pais_real_eq2 = None
+        if nivel == "r16":
+            _info_real_eq1 = madre_r16_flags.get(celda_eq1) if celda_eq1 else None
+            _info_real_eq2 = madre_r16_flags.get(celda_eq2) if celda_eq2 else None
+            pais_real_eq1 = _info_real_eq1[1] if _info_real_eq1 else None
+            pais_real_eq2 = _info_real_eq2[1] if _info_real_eq2 else None
 
         for nombre in nombres:
             puntos = 0
 
-            # 1) ¿Quién pasa a Octavos?
-            if pais_real_r16 and celda_r16:
-                fila = prediccion.get((nombre, celda_r16))
-                if fila and (fila.get("pais") or "").strip() == pais_real_r16:
+            # 1) ¿Quién pasa a Octavos? (r32) / ¿Quién pasa a Cuartos? (r16)
+            if pais_real_avance and celda_avance:
+                fila = prediccion.get((nombre, celda_avance))
+                if fila and (fila.get("pais") or "").strip() == pais_real_avance:
                     puntos += PUNTOS_POR_ACIERTO_BONUS
 
-            # 2) Goles Dieciseisavos — equipo 1
+            # 2) Goles equipo 1 (Dieciseisavos si r32 / Octavos si r16)
             if goles_real_eq1 is not None and celda_eq1:
                 fila = prediccion.get((nombre, celda_eq1))
                 if fila:
                     try:
-                        if int(fila.get("goles")) == int(goles_real_eq1):
+                        goles_ok = int(fila.get("goles")) == int(goles_real_eq1)
+                        if nivel == "r16":
+                            pais_hijo = (fila.get("pais") or "").strip()
+                            goles_ok = goles_ok and bool(pais_real_eq1) and pais_hijo == pais_real_eq1
+                        if goles_ok:
                             puntos += PUNTOS_POR_ACIERTO_BONUS
                     except (ValueError, TypeError):
                         pass
 
-            # 3) Goles Dieciseisavos — equipo 2
+            # 3) Goles equipo 2 (Dieciseisavos si r32 / Octavos si r16)
             if goles_real_eq2 is not None and celda_eq2:
                 fila = prediccion.get((nombre, celda_eq2))
                 if fila:
                     try:
-                        if int(fila.get("goles")) == int(goles_real_eq2):
+                        goles_ok = int(fila.get("goles")) == int(goles_real_eq2)
+                        if nivel == "r16":
+                            pais_hijo = (fila.get("pais") or "").strip()
+                            goles_ok = goles_ok and bool(pais_real_eq2) and pais_hijo == pais_real_eq2
+                        if goles_ok:
                             puntos += PUNTOS_POR_ACIERTO_BONUS
                     except (ValueError, TypeError):
                         pass
@@ -437,6 +515,9 @@ madre_qf_flags = {
     "B13": ("no.svg", "Noruega"),
     "B14": ("gb-eng.svg", "Inglaterra"),
     "C13": ("es.svg", "España"),
+    "C14": ("be.svg", "Bélgica"),
+    "D13": ("ar.svg", "Argentina"),
+    "D14": ("ch.svg", "Suiza")
 }
 madre_sf_flags = {}
 madre_final_flags = {}
@@ -459,7 +540,8 @@ goles_madre_r32 = {
     "D3": 2, "D7": 0,
     "D2": 3, "D6": 5,
     "D1": 3, "D5": 2,
-    "D4": 0, "D8": 1
+    "D4": 0, "D8": 1,
+    "D10": 3, "D11": 4,
 }
 goles_madre_r16 = {
     
@@ -468,6 +550,9 @@ goles_madre_r16 = {
     "B9": 1, "B10": 2, 
     "B11": 2, "B12": 3,
     "C9": 0, "C10": 1,
+    "C11": 1, "C12": 4,
+    "D9": 3, "D10": 2,
+    "D12": 3, "D10": 2,
 }
 goles_madre_qf = {}
 goles_madre_sf = {}
@@ -1894,7 +1979,7 @@ bonus_goles_activo = True
 # ── Visibilidad manual ───────────────────────────────────────────────
 # True  → el bonus se muestra (sujeto además a la ventana de tiempo)
 # False → el bonus está oculto sin importar fecha/hora
-bonus_visible = True
+bonus_visible = False
 
 # ── Ventana de tiempo de activación (hora CDMX = America/Mexico_City) ─
 # Formato fecha: "DD/MM/YYYY"    Formato hora: "HH:MM" en 24h
