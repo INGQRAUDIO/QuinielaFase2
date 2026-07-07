@@ -436,6 +436,7 @@ madre_qf_flags = {
     "A14": ("ma.svg", "Marruecos"),
     "B13": ("no.svg", "Noruega"),
     "B14": ("gb-eng.svg", "Inglaterra"),
+    "C13": ("es.svg", "España"),
 }
 madre_sf_flags = {}
 madre_final_flags = {}
@@ -466,6 +467,7 @@ goles_madre_r16 = {
     "A9": 0, "A10": 1,
     "B9": 1, "B10": 2, 
     "B11": 2, "B12": 3,
+    "C9": 0, "C10": 1,
 }
 goles_madre_qf = {}
 goles_madre_sf = {}
@@ -1871,9 +1873,23 @@ components.html(bracket_html, height=SVG_HEIGHT + 60, scrolling=False)
 #   BONUS_HORA_FIN      → hora de cierre   "HH:MM" (CDMX)
 # ─────────────────────────────────────────────────────────────────────
 
-BONUS_NUMBER      = 1           # ← identificador del bonus
-BONUS_EQUIPO1     = "dz"        # ← equipo 1 (Argelia)
-BONUS_EQUIPO2     = "ch"        # ← equipo 2 (Suiza)
+BONUS_NUMBER      = 2           # ← identificador del bonus
+BONUS_EQUIPO1     = "ar"        # ← equipo 1 (Argentina)
+BONUS_EQUIPO2     = "eg"        # ← equipo 2 (Bélgica)
+
+# ════════════════════════════════════════════════════════════════════
+#  CELDAS DEL BONUS — definen dónde se hace el UPDATE en Quiniela_Fase2
+# ════════════════════════════════════════════════════════════════════
+# Cambia estas dos celdas manualmente para cada nuevo bonus.
+# Son las posiciones del bracket donde se actualizará pais + goles
+# del participante cuando envíe su pronóstico.
+BONUS_CELDA1 = "D10"   # ← celda del equipo 1
+BONUS_CELDA2 = "D9"   # ← celda del equipo 2
+
+# ── Control de inputs de goles ───────────────────────────────────────
+# True  → aparecen los inputs de goles + hace UPDATE en Quiniela_Fase2
+# False → solo registra en BonusCheck (sin actualizar goles ni país)
+bonus_goles_activo = True
 
 # ── Visibilidad manual ───────────────────────────────────────────────
 # True  → el bonus se muestra (sujeto además a la ventana de tiempo)
@@ -1882,9 +1898,9 @@ bonus_visible = True
 
 # ── Ventana de tiempo de activación (hora CDMX = America/Mexico_City) ─
 # Formato fecha: "DD/MM/YYYY"    Formato hora: "HH:MM" en 24h
-BONUS_FECHA       = "02/07/2026"
-BONUS_HORA_INICIO = "20:30"
-BONUS_HORA_FIN    = "20:40"
+BONUS_FECHA       = "07/07/2026"
+BONUS_HORA_INICIO = "09:00"
+BONUS_HORA_FIN    = "09:55"
 
 # ── Cálculo de estado temporal ───────────────────────────────────────
 _TZ_CDMX = pytz.timezone("America/Mexico_City")
@@ -1945,10 +1961,72 @@ def _enviar_bonus(nombre_participante):
     except Exception:
         return False
 
+
+def _actualizar_goles_bonus(nombre_participante, goles1, goles2):
+    """
+    Hace dos PATCH en Quiniela_Fase2 para actualizar país y goles:
+      WHERE nombre = nombre_participante AND celda = BONUS_CELDA1
+        → SET pais = _nombre_eq1, goles = goles1
+      WHERE nombre = nombre_participante AND celda = BONUS_CELDA2
+        → SET pais = _nombre_eq2, goles = goles2
+    Retorna (ok1, ok2, debug1, debug2).
+    """
+    headers = {
+        "apikey": SUPABASE_KEY,
+        "Authorization": f"Bearer {SUPABASE_KEY}",
+        "Content-Type": "application/json",
+        "Prefer": "return=representation",   # ← devuelve la fila actualizada
+    }
+
+    def _patch(celda, pais_val, goles_val):
+        # safe='' → codifica espacios como %20 pero respeta caracteres
+        # especiales del nombre. Supabase acepta %20 en filtros eq.
+        nombre_enc = urllib.parse.quote(nombre_participante, safe="")
+        celda_enc  = urllib.parse.quote(celda, safe="")
+        url = (
+            f"{SUPABASE_URL}/rest/v1/Quiniela_Fase2"
+            f"?nombre=eq.{nombre_enc}"
+            f"&celda=eq.{celda_enc}"
+        )
+        payload = {"pais": pais_val, "goles": int(goles_val)}
+        try:
+            r = requests.patch(url, headers=headers, json=payload, timeout=10)
+        except Exception as exc:
+            return False, {"url": url, "error": str(exc)}
+
+        # Con "Prefer: return=representation", PostgREST responde 200 y
+        # devuelve un array con las filas que SÍ se modificaron. Si ese
+        # array viene vacío ([]), la petición "tuvo éxito" a nivel HTTP
+        # pero CERO filas cumplieron el WHERE (nombre+celda) — típicamente
+        # porque RLS (Row Level Security) las está ocultando para el rol
+        # anon/publishable. Un status 200/204 por sí solo NO significa
+        # que algo se haya actualizado de verdad.
+        filas_afectadas = []
+        if r.text:
+            try:
+                filas_afectadas = r.json()
+            except ValueError:
+                filas_afectadas = []
+
+        ok = r.status_code == 200 and len(filas_afectadas) > 0
+        debug = {
+            "url":             url,
+            "status":          r.status_code,
+            "body":            r.text[:300] if r.text else "(vacío)",
+            "filas_afectadas": len(filas_afectadas),
+        }
+        return ok, debug
+
+    ok1, dbg1 = _patch(BONUS_CELDA1, _nombre_eq1, goles1)
+    ok2, dbg2 = _patch(BONUS_CELDA2, _nombre_eq2, goles2)
+    return ok1, ok2, dbg1, dbg2
+
 # ── Estado de sesión ─────────────────────────────────────────────────
 if "bonus_abierto"   not in st.session_state: st.session_state.bonus_abierto   = False
 if "bonus_enviado"   not in st.session_state: st.session_state.bonus_enviado   = False
 if "bonus_seleccion" not in st.session_state: st.session_state.bonus_seleccion = None
+if "bonus_goles1"    not in st.session_state: st.session_state.bonus_goles1    = 0
+if "bonus_goles2"    not in st.session_state: st.session_state.bonus_goles2    = 0
 
 _lista_bonus = obtener_participantes() or []
 
@@ -2211,23 +2289,27 @@ if bonus_visible:
 
         # ── Lógica de interacción según estado temporal ───────────────
         if _bonus_activo:
-            # Bonus abierto: mostrar interacción completa
             if not st.session_state.bonus_enviado:
+
+                # ── PASO 1: ACEPTAR BONUS ─────────────────────────────
                 if not st.session_state.bonus_abierto:
                     _bl1, _bm1, _br1 = st.columns([1, 2, 1])
                     with _bm1:
                         if st.button(
-                            "ACEPTAR BONUS",
+                            "⚡ ACEPTAR BONUS",
                             key="btn_bonus_toggle",
                             use_container_width=True,
                         ):
                             st.session_state.bonus_abierto   = True
                             st.session_state.bonus_seleccion = None
+                            st.session_state.bonus_goles1    = 0
+                            st.session_state.bonus_goles2    = 0
                             st.rerun()
 
+                # ── PASO 2: SELECCIONAR PARTICIPANTE ──────────────────
                 if st.session_state.bonus_abierto and _lista_bonus:
                     seleccion = st.selectbox(
-                        "Participante",
+                        "Selecciona tu nombre",
                         options=["— elige —"] + _lista_bonus,
                         key="bonus_select",
                         label_visibility="collapsed",
@@ -2235,36 +2317,144 @@ if bonus_visible:
                     if seleccion != "— elige —":
                         st.session_state.bonus_seleccion = seleccion
 
+                    # ── PASO 3: INPUTS DE GOLES ───────────────────────
                     if st.session_state.bonus_seleccion:
+
+                        if bonus_goles_activo:
+                            st.markdown(
+                                '<div style="text-align:center; color:#7a6535; '
+                                'font-family:monospace; font-size:11px; '
+                                'letter-spacing:2px; margin:14px 0 6px 0;">'
+                                'PRONÓSTICO DE GOLES</div>',
+                                unsafe_allow_html=True,
+                            )
+                            _gc1, _gv, _gc2 = st.columns([2, 1, 2])
+
+                            with _gc1:
+                                st.markdown(
+                                    f'<div style="text-align:center; color:#d8cba8; '
+                                    f'font-family:monospace; font-size:11px; '
+                                    f'margin-bottom:4px;">{_nombre_eq1}</div>',
+                                    unsafe_allow_html=True,
+                                )
+                                goles1 = st.number_input(
+                                    label=_nombre_eq1,
+                                    min_value=0, max_value=30,
+                                    value=st.session_state.bonus_goles1,
+                                    step=1, key="input_goles1",
+                                    label_visibility="collapsed",
+                                )
+                                st.session_state.bonus_goles1 = goles1
+
+                            with _gv:
+                                st.markdown(
+                                    '<div style="text-align:center; color:#7a6535; '
+                                    'font-family:monospace; font-size:16px; '
+                                    'padding-top:28px;">VS</div>',
+                                    unsafe_allow_html=True,
+                                )
+
+                            with _gc2:
+                                st.markdown(
+                                    f'<div style="text-align:center; color:#d8cba8; '
+                                    f'font-family:monospace; font-size:11px; '
+                                    f'margin-bottom:4px;">{_nombre_eq2}</div>',
+                                    unsafe_allow_html=True,
+                                )
+                                goles2 = st.number_input(
+                                    label=_nombre_eq2,
+                                    min_value=0, max_value=30,
+                                    value=st.session_state.bonus_goles2,
+                                    step=1, key="input_goles2",
+                                    label_visibility="collapsed",
+                                )
+                                st.session_state.bonus_goles2 = goles2
+
+                            st.markdown(
+                                f'<div style="text-align:center; color:#c8a84b; '
+                                f'font-family:monospace; font-size:13px; '
+                                f'letter-spacing:2px; margin:10px 0 4px 0;">'
+                                f'{int(st.session_state.bonus_goles1)} '
+                                f'— '
+                                f'{int(st.session_state.bonus_goles2)}</div>',
+                                unsafe_allow_html=True,
+                            )
+
+                        # ── PASO 4: ENVIAR ────────────────────────────
                         _bl2, _bm2, _br2 = st.columns([1, 2, 1])
                         with _bm2:
-                            if st.button("✓ ENVIAR", key="btn_bonus_enviar", use_container_width=True):
-                                ok = _enviar_bonus(st.session_state.bonus_seleccion)
-                                if ok:
+                            if st.button(
+                                "✓ ENVIAR",
+                                key="btn_bonus_enviar",
+                                use_container_width=True,
+                            ):
+                                nombre_sel = st.session_state.bonus_seleccion
+                                errores = []
+
+                                # INSERT en BonusCheck
+                                if not _enviar_bonus(nombre_sel):
+                                    errores.append("Error al registrar en BonusCheck.")
+
+                                # UPDATE en Quiniela_Fase2 (solo si activo)
+                                if bonus_goles_activo:
+                                    ok1, ok2, dbg1, dbg2 = _actualizar_goles_bonus(
+                                        nombre_sel,
+                                        st.session_state.bonus_goles1,
+                                        st.session_state.bonus_goles2,
+                                    )
+                                    def _nota_rls(dbg):
+                                        if dbg.get("filas_afectadas") == 0:
+                                            return (" → 0 filas coincidieron. Revisa la "
+                                                     "policy de UPDATE (RLS) en Supabase, o "
+                                                     "que nombre/celda existan tal cual.")
+                                        return ""
+
+                                    if not ok1:
+                                        errores.append(
+                                            f"Error {BONUS_CELDA1} "
+                                            f"[{dbg1.get('status','?')}]: "
+                                            f"{dbg1.get('body', dbg1.get('error',''))}"
+                                            f"{_nota_rls(dbg1)}"
+                                        )
+                                    if not ok2:
+                                        errores.append(
+                                            f"Error {BONUS_CELDA2} "
+                                            f"[{dbg2.get('status','?')}]: "
+                                            f"{dbg2.get('body', dbg2.get('error',''))}"
+                                            f"{_nota_rls(dbg2)}"
+                                        )
+
+                                if not errores:
                                     st.session_state.bonus_enviado = True
                                     st.session_state.bonus_abierto = False
                                     st.rerun()
                                 else:
-                                    st.markdown(
-                                        '<div class="bonus-err">Error al enviar. Intenta de nuevo.</div>',
-                                        unsafe_allow_html=True,
-                                    )
+                                    for e in errores:
+                                        st.markdown(
+                                            f'<div class="bonus-err">{e}</div>',
+                                            unsafe_allow_html=True,
+                                        )
             else:
+                resumen = (
+                    f" · {int(st.session_state.bonus_goles1)}–"
+                    f"{int(st.session_state.bonus_goles2)}"
+                    if bonus_goles_activo else ""
+                )
                 st.markdown(
                     f'<div class="bonus-ok">✓ Bonus registrado<br/>'
-                    f'<span style="opacity:.7">{st.session_state.bonus_seleccion}</span></div>',
+                    f'<span style="opacity:.7">'
+                    f'{st.session_state.bonus_seleccion}{resumen}'
+                    f'</span></div>',
                     unsafe_allow_html=True,
                 )
 
-
-
         elif _bonus_pendiente:
-            # Todavía no abre: solo mostrar el contador (ya se ve arriba)
             pass
 
         elif _bonus_cerrado:
             st.markdown(
-                '<div class="bonus-cerrado">🔴 El tiempo de este bonus ha cerrado. Se abriran mas bonuses en el futuro. Atentos!!</div>',
+                '<div class="bonus-cerrado">🔴 El tiempo de este bonus ha cerrado. '
+                'Se abrirán más bonuses en el futuro. ¡Atentos!</div>',
                 unsafe_allow_html=True,
             )
 
