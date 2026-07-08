@@ -33,6 +33,7 @@ _PAGE_ICON = _cargar_icono(_ICON_PATH) if os.path.exists(_ICON_PATH) else "🏆"
 # ─── Supabase ────────────────────────────────────────────────────────
 SUPABASE_URL = st.secrets["SUPABASE_URL"]
 SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
+
 @st.cache_data(ttl=0)
 def obtener_participantes():
     headers = {
@@ -519,7 +520,8 @@ madre_qf_flags = {
     "D13": ("ar.svg", "Argentina"),
     "D14": ("ch.svg", "Suiza")
 }
-madre_sf_flags = {}
+madre_sf_flags = {
+}
 madre_final_flags = {}
 madre_champion_flags = {}
 
@@ -1591,12 +1593,14 @@ if participante_seleccionado:
     # ════════════════════════════════════════════════════════════════
     #  ORDEN DE TABLAS EN STATS DE PARTICIPANTE:
     #  1. Rueda (ya renderizada arriba)
-    #  2. QUIEN PASA A CUARTOS?      ← nueva
-    #  3. GOLES OCTAVOS              ← nueva
-    #  4. QUIEN PASA A OCTAVOS?      ← existente (con acordeón)
-    #  5. GOLES DIECISEISAVOS        ← existente (con acordeón)
-    #  6. INSIGNIAS
-    #  7. Botón volver
+    #  2. QUIEN PASA A SEMIFINALES?  ← nueva
+    #  3. GOLES CUARTOS              ← nueva
+    #  4. QUIEN PASA A CUARTOS?      ← existente
+    #  5. GOLES OCTAVOS              ← existente
+    #  6. QUIEN PASA A OCTAVOS?      ← existente (con acordeón)
+    #  7. GOLES DIECISEISAVOS        ← existente (con acordeón)
+    #  8. INSIGNIAS
+    #  9. Botón volver
     # ════════════════════════════════════════════════════════════════
 
     # ── Helper reutilizable de comparar goles ────────────────────────
@@ -1769,6 +1773,33 @@ if participante_seleccionado:
             html = construir_tabla_detalle_html(titulo_tabla, subtitulo_tabla, tabla_bloque,
                                                 ocultar_columnas=["col-celda"])
         return html, altura
+
+    # ════════════════════════════════════════════════════════════════
+    #  TABLA "QUIEN PASA A SEMIFINALES?"
+    # ════════════════════════════════════════════════════════════════
+    html_semis, alt_semis = _tabla_pais(
+        filas_data=datos,
+        clave_set=claves_sf,                   # ← compara con resultados de claves_sf
+        titulo_tabla="¿QUIÉN PASA A SEMIFINALES?",
+        subtitulo_tabla="Verde = acierto vs. resultado real &middot; Rojo = no coincide",
+        resultados_ref=resultados_madre_por_celda,
+        acordeon=False,
+    )
+    st.components.v1.html(html_semis, height=alt_semis, scrolling=False)
+
+    # ════════════════════════════════════════════════════════════════
+    #  TABLA "GOLES CUARTOS"
+    # ════════════════════════════════════════════════════════════════
+    html_goles_cuartos, alt_goles_cuartos = _tabla_goles(
+        filas_data=datos,
+        clave_set=claves_qf,                  # ← celdas QF (D13, D14…)
+        goles_ref=goles_madre_qf,             # ← compara con goles_madre_qf
+        titulo_tabla="GOLES CUARTOS",
+        subtitulo_tabla="Verde = goles exactos &middot; Rojo = no coincide",
+        acordeon=False,
+        validar_pais={celda: info[1] for celda, info in madre_qf_flags.items()},
+    )
+    st.components.v1.html(html_goles_cuartos, height=alt_goles_cuartos, scrolling=False)
 
     # ════════════════════════════════════════════════════════════════
     #  TABLA "QUIEN PASA A CUARTOS?" — AQUI ESTA LA TABLA DE QUIEN PASA A CUARTOS
