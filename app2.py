@@ -125,6 +125,7 @@ def calcular_aciertos_por_participante(rows):
     claves_r16_set = set(r16_key_map.values())
     claves_r32_set = set(mapeo_circulo_a_indice.values())
     claves_qf_set  = set(qf_key_map.values())
+    claves_sf_set  = set(sf_key_map.values())
 
     for nombre, rows_participante in participantes_rows.items():
         total = 0
@@ -132,9 +133,10 @@ def calcular_aciertos_por_participante(rows):
             celda = (row.get("celda") or "").strip()
 
             # ── "¿Quién pasa?" (país) ──────────────────────────────────
-            # Aplica a las celdas de Octavos ("Quién pasa a Octavos?")
-            # y a las de Cuartos ("Quién pasa a Cuartos?")
-            if celda in claves_r16_set or celda in claves_qf_set:
+            # Aplica a las celdas de Octavos ("Quién pasa a Octavos?"),
+            # Cuartos ("Quién pasa a Cuartos?") y Semifinales
+            # ("Quién pasa a Semifinales?")
+            if celda in claves_r16_set or celda in claves_qf_set or celda in claves_sf_set:
                 pais_hijo = (row.get("pais") or "").strip()
                 pais_madre = resultados_madre_por_celda.get(celda)
                 if pais_madre and pais_hijo == pais_madre:
@@ -172,6 +174,29 @@ def calcular_aciertos_por_participante(rows):
                 goles_madre = goles_madre_por_celda.get(celda)
                 if goles_madre is not None and goles_madre != "":
                     pais_real_info = madre_r16_flags.get(celda)
+                    pais_real = pais_real_info[1] if pais_real_info else None
+                    pais_hijo = (row.get("pais") or "").strip()
+                    try:
+                        if (pais_real and pais_hijo == pais_real
+                                and int(goles_hijo) == int(goles_madre)):
+                            total += 1
+                    except (ValueError, TypeError):
+                        pass
+
+            # ── Goles Cuartos ────────────────────────────────────────────
+            # Igual criterio que "Goles Octavos": el equipo de la celda
+            # depende de quién ganó Octavos, así que el acierto solo
+            # cuenta si, ADEMÁS de coincidir los goles, el país predicho
+            # es realmente el que avanzó según madre_qf_flags.
+            if celda in claves_qf_set:
+                goles_hijo = row.get("goles")
+                if goles_hijo is None:
+                    goles_hijo = ""
+                else:
+                    goles_hijo = str(goles_hijo).strip()
+                goles_madre = goles_madre_por_celda.get(celda)
+                if goles_madre is not None and goles_madre != "":
+                    pais_real_info = madre_qf_flags.get(celda)
                     pais_real = pais_real_info[1] if pais_real_info else None
                     pais_hijo = (row.get("pais") or "").strip()
                     try:
@@ -521,6 +546,7 @@ madre_qf_flags = {
     "D14": ("ch.svg", "Suiza")
 }
 madre_sf_flags = {
+
 }
 madre_final_flags = {}
 madre_champion_flags = {}
@@ -555,7 +581,9 @@ goles_madre_r16 = {
     "D9": 3, "D10": 2,
     "D11": 4, "D12": 3
 }
-goles_madre_qf = {}
+goles_madre_qf = {
+
+}
 goles_madre_sf = {}
 goles_madre_final = {}
 goles_madre_champion = {}
