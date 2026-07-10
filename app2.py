@@ -582,7 +582,7 @@ goles_madre_r16 = {
     "D11": 4, "D12": 3
 }
 goles_madre_qf = {
-    "A13": 0, "A14": 2
+    "A13": 2, "A14": 0
 }
 goles_madre_sf = {}
 goles_madre_final = {}
