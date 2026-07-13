@@ -126,6 +126,7 @@ def calcular_aciertos_por_participante(rows):
     claves_r32_set = set(mapeo_circulo_a_indice.values())
     claves_qf_set  = set(qf_key_map.values())
     claves_sf_set  = set(sf_key_map.values())
+    claves_fin_set = set(final_key_map.values())
 
     for nombre, rows_participante in participantes_rows.items():
         total = 0
@@ -134,9 +135,10 @@ def calcular_aciertos_por_participante(rows):
 
             # ── "¿Quién pasa?" (país) ──────────────────────────────────
             # Aplica a las celdas de Octavos ("Quién pasa a Octavos?"),
-            # Cuartos ("Quién pasa a Cuartos?") y Semifinales
-            # ("Quién pasa a Semifinales?")
-            if celda in claves_r16_set or celda in claves_qf_set or celda in claves_sf_set:
+            # Cuartos ("Quién pasa a Cuartos?"), Semifinales
+            # ("Quién pasa a Semifinales?") y Finales ("Quién pasa a Finales?")
+            if (celda in claves_r16_set or celda in claves_qf_set
+                    or celda in claves_sf_set or celda in claves_fin_set):
                 pais_hijo = (row.get("pais") or "").strip()
                 pais_madre = resultados_madre_por_celda.get(celda)
                 if pais_madre and pais_hijo == pais_madre:
@@ -197,6 +199,29 @@ def calcular_aciertos_por_participante(rows):
                 goles_madre = goles_madre_por_celda.get(celda)
                 if goles_madre is not None and goles_madre != "":
                     pais_real_info = madre_qf_flags.get(celda)
+                    pais_real = pais_real_info[1] if pais_real_info else None
+                    pais_hijo = (row.get("pais") or "").strip()
+                    try:
+                        if (pais_real and pais_hijo == pais_real
+                                and int(goles_hijo) == int(goles_madre)):
+                            total += 1
+                    except (ValueError, TypeError):
+                        pass
+
+            # ── Goles Semifinales ────────────────────────────────────────
+            # Igual criterio que "Goles Cuartos": el equipo de la celda
+            # depende de quién ganó Cuartos, así que el acierto solo
+            # cuenta si, ADEMÁS de coincidir los goles, el país predicho
+            # es realmente el que avanzó según madre_sf_flags.
+            if celda in claves_sf_set:
+                goles_hijo = row.get("goles")
+                if goles_hijo is None:
+                    goles_hijo = ""
+                else:
+                    goles_hijo = str(goles_hijo).strip()
+                goles_madre = goles_madre_por_celda.get(celda)
+                if goles_madre is not None and goles_madre != "":
+                    pais_real_info = madre_sf_flags.get(celda)
                     pais_real = pais_real_info[1] if pais_real_info else None
                     pais_hijo = (row.get("pais") or "").strip()
                     try:
@@ -551,7 +576,10 @@ madre_sf_flags = {
     "C15": ("es.svg", "España"),
     "D15": ("ar.svg", "Argentina")
 }
-madre_final_flags = {}
+madre_final_flags = {
+    #"S1": ("fr.svg", "Francia"),
+    #"S2": ("ar.svg", "Argentina")
+}
 madre_champion_flags = {}
 
 # ── Goles de la rueda madre ─────────────────────────────────────────
@@ -590,8 +618,13 @@ goles_madre_qf = {
     "C13": 2, "C14": 1,
     "D13": 3, "D14": 1
 }
-goles_madre_sf = {}
-goles_madre_final = {}
+goles_madre_sf = {
+    #"A15": 2, "C15": 1,
+    #"B15": 1, "D15": 2
+}
+goles_madre_final = {
+    #"S1": 2, "S2": 1
+}
 goles_madre_champion = {}
 
 def _construir_goles_madre():
@@ -1807,6 +1840,33 @@ if participante_seleccionado:
             html = construir_tabla_detalle_html(titulo_tabla, subtitulo_tabla, tabla_bloque,
                                                 ocultar_columnas=["col-celda"])
         return html, altura
+
+    # ════════════════════════════════════════════════════════════════
+    #  TABLA "QUIEN PASA A FINALES?" — clon de "Quién pasa a Semifinales"
+    # ════════════════════════════════════════════════════════════════
+    html_finales, alt_finales = _tabla_pais(
+        filas_data=datos,
+        clave_set=claves_fin,                  # ← compara con resultados de claves_fin
+        titulo_tabla="¿QUIÉN PASA A LA GRAN FINAL?",
+        subtitulo_tabla="Verde = acierto vs. resultado real &middot; Rojo = no coincide",
+        resultados_ref=resultados_madre_por_celda,
+        acordeon=False,
+    )
+    st.components.v1.html(html_finales, height=alt_finales, scrolling=False)
+
+    # ════════════════════════════════════════════════════════════════
+    #  TABLA "GOLES SEMIFINALES" — clon de "Goles Cuartos"
+    # ════════════════════════════════════════════════════════════════
+    html_goles_semis, alt_goles_semis = _tabla_goles(
+        filas_data=datos,
+        clave_set=claves_sf,                  # ← celdas SF (B15, D15…)
+        goles_ref=goles_madre_sf,             # ← compara con goles_madre_sf
+        titulo_tabla="GOLES SEMIFINALES",
+        subtitulo_tabla="Verde = goles exactos &middot; Rojo = no coincide",
+        acordeon=False,
+        validar_pais={celda: info[1] for celda, info in madre_sf_flags.items()},
+    )
+    st.components.v1.html(html_goles_semis, height=alt_goles_semis, scrolling=False)
 
     # ════════════════════════════════════════════════════════════════
     #  TABLA "QUIEN PASA A SEMIFINALES?"
