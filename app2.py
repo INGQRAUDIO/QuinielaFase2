@@ -547,6 +547,9 @@ madre_qf_flags = {
 }
 madre_sf_flags = {
     "A15": ("fr.svg", "Francia"),
+    "B15": ("gb-eng.svg", "Inglaterra"),
+    "C15": ("es.svg", "España"),
+    "D15": ("ar.svg", "Argentina")
 }
 madre_final_flags = {}
 madre_champion_flags = {}
@@ -582,7 +585,10 @@ goles_madre_r16 = {
     "D11": 4, "D12": 3
 }
 goles_madre_qf = {
-    "A13": 2, "A14": 0
+    "A13": 2, "A14": 0,
+    "B13": 1, "B14": 2,
+    "C13": 2, "C14": 1,
+    "D13": 3, "D14": 1
 }
 goles_madre_sf = {}
 goles_madre_final = {}
