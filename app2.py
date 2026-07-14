@@ -577,7 +577,7 @@ madre_sf_flags = {
     "D15": ("ar.svg", "Argentina")
 }
 madre_final_flags = {
-    "S1": ("es.svg", "España"),
+    #"S1": ("es.svg", "España"),
     #"S2": ("ar.svg", "Argentina")
 }
 madre_champion_flags = {}
@@ -619,7 +619,7 @@ goles_madre_qf = {
     "D13": 3, "D14": 1
 }
 goles_madre_sf = {
-    "A15": 0, "C15": 2,
+    #"A15": 0, "C15": 2,
     #"B15": 1, "D15": 2
 }
 goles_madre_final = {
