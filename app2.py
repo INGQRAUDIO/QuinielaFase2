@@ -127,6 +127,7 @@ def calcular_aciertos_por_participante(rows):
     claves_qf_set  = set(qf_key_map.values())
     claves_sf_set  = set(sf_key_map.values())
     claves_fin_set = set(final_key_map.values())
+    claves_camp_set = set(champion_key_map.values())
 
     for nombre, rows_participante in participantes_rows.items():
         total = 0
@@ -136,9 +137,11 @@ def calcular_aciertos_por_participante(rows):
             # ── "¿Quién pasa?" (país) ──────────────────────────────────
             # Aplica a las celdas de Octavos ("Quién pasa a Octavos?"),
             # Cuartos ("Quién pasa a Cuartos?"), Semifinales
-            # ("Quién pasa a Semifinales?") y Finales ("Quién pasa a Finales?")
+            # ("Quién pasa a Semifinales?"), Finales ("Quién pasa a
+            # Finales?") y Campeón ("¿Quién ganó la Copa del Mundo?")
             if (celda in claves_r16_set or celda in claves_qf_set
-                    or celda in claves_sf_set or celda in claves_fin_set):
+                    or celda in claves_sf_set or celda in claves_fin_set
+                    or celda in claves_camp_set):
                 pais_hijo = (row.get("pais") or "").strip()
                 pais_madre = resultados_madre_por_celda.get(celda)
                 if pais_madre and pais_hijo == pais_madre:
@@ -222,6 +225,30 @@ def calcular_aciertos_por_participante(rows):
                 goles_madre = goles_madre_por_celda.get(celda)
                 if goles_madre is not None and goles_madre != "":
                     pais_real_info = madre_sf_flags.get(celda)
+                    pais_real = pais_real_info[1] if pais_real_info else None
+                    pais_hijo = (row.get("pais") or "").strip()
+                    try:
+                        if (pais_real and pais_hijo == pais_real
+                                and int(goles_hijo) == int(goles_madre)):
+                            total += 1
+                    except (ValueError, TypeError):
+                        pass
+
+            # ── Goles Final ──────────────────────────────────────────────
+            # Igual criterio que "Goles Semifinales": el equipo de la
+            # celda depende de quién ganó Semifinales, así que el
+            # acierto solo cuenta si, ADEMÁS de coincidir los goles,
+            # el país predicho es realmente el que avanzó según
+            # madre_final_flags.
+            if celda in claves_fin_set:
+                goles_hijo = row.get("goles")
+                if goles_hijo is None:
+                    goles_hijo = ""
+                else:
+                    goles_hijo = str(goles_hijo).strip()
+                goles_madre = goles_madre_por_celda.get(celda)
+                if goles_madre is not None and goles_madre != "":
+                    pais_real_info = madre_final_flags.get(celda)
                     pais_real = pais_real_info[1] if pais_real_info else None
                     pais_hijo = (row.get("pais") or "").strip()
                     try:
@@ -675,6 +702,121 @@ def _construir_resultados_madre():
     return resultados
 
 resultados_madre_por_celda = _construir_resultados_madre()
+
+# ── Config compartida del TERCER LUGAR (equipos + resultado real) ────
+# Se usa tanto en el panel de envío (más abajo, sección "PANEL TERCER
+# LUGAR") como en las tablas nuevas de stats del participante. Vive
+# aquí (arriba de todo) para que ambos lados lean SIEMPRE los mismos
+# valores y no se puedan desincronizar.
+#
+# CÓMO CONFIGURAR:
+#   TERCER_EQUIPO1 / TERCER_EQUIPO2   → códigos de bandera de los equipos
+#   TERCER_LUGAR_GANADOR_REAL         → None mientras no se juegue el
+#                                        partido; luego "Francia" o
+#                                        "Inglaterra" (nombre exacto)
+#   TERCER_LUGAR_GOLES_REAL           → None/None mientras no se juegue;
+#                                        luego los goles reales de cada uno
+TERCER_EQUIPO1 = "fr"        # ← equipo 1 (Francia) — círculo izquierdo
+TERCER_EQUIPO2 = "gb-eng"    # ← equipo 2 (Inglaterra) — círculo derecho
+
+TERCER_LUGAR_GANADOR_REAL = None    # ← poner el nombre del ganador real cuando se sepa
+TERCER_LUGAR_GOLES_REAL = {
+    "equipo1": None,   # ← goles reales del equipo 1 (Francia)
+    "equipo2": None,   # ← goles reales del equipo 2 (Inglaterra)
+}
+
+_nombre_t1 = flag_to_country.get(TERCER_EQUIPO1, TERCER_EQUIPO1)
+_nombre_t2 = flag_to_country.get(TERCER_EQUIPO2, TERCER_EQUIPO2)
+
+
+def _obtener_registro_tercer_lugar(nombre_participante):
+    """Devuelve la fila de 3erLugar_Quiniela de ese participante (o None)."""
+    headers = {
+        "apikey": SUPABASE_KEY,
+        "Authorization": f"Bearer {SUPABASE_KEY}",
+    }
+    nombre_enc = urllib.parse.quote(nombre_participante.strip(), safe="")
+    url = (
+        f"{SUPABASE_URL}/rest/v1/3erLugar_Quiniela"
+        f"?select=*&nombre=eq.{nombre_enc}&limit=1"
+    )
+    try:
+        r = requests.get(url, headers=headers, timeout=8)
+        r.raise_for_status()
+        filas = r.json()
+        return filas[0] if filas else None
+    except Exception:
+        return None
+
+
+@st.cache_data(ttl=0)
+def obtener_registros_tercer_lugar():
+    """Devuelve TODAS las filas de la tabla 3erLugar_Quiniela (para sumar
+    los aciertos de todos los participantes en la tabla general)."""
+    headers = {
+        "apikey": SUPABASE_KEY,
+        "Authorization": f"Bearer {SUPABASE_KEY}",
+    }
+    all_rows = []
+    limit = 1000
+    offset = 0
+    while True:
+        url = (
+            f"{SUPABASE_URL}/rest/v1/3erLugar_Quiniela"
+            f"?select=*&limit={limit}&offset={offset}"
+        )
+        try:
+            resp = requests.get(url, headers=headers, timeout=8)
+            resp.raise_for_status()
+            batch = resp.json()
+            if not batch:
+                break
+            all_rows.extend(batch)
+            offset += limit
+        except Exception as e:
+            st.error(f"Error al obtener registros de Tercer Lugar: {e}")
+            return []
+    return all_rows
+
+
+def calcular_puntos_tercer_lugar_todos(registros_tercer):
+    """Calcula, por participante, los aciertos de las tablas '¿Quién gana
+    Tercer Lugar?' y 'Goles Tercer Lugar' (1 punto por cada acierto:
+    ganador correcto, goles equipo1 correctos, goles equipo2 correctos).
+    Mientras TERCER_LUGAR_GANADOR_REAL / TERCER_LUGAR_GOLES_REAL sigan en
+    None (partido no jugado todavía), no se otorga ningún punto."""
+    puntos = {}
+    ganador_real = (TERCER_LUGAR_GANADOR_REAL or "").strip()
+    g1_real = TERCER_LUGAR_GOLES_REAL.get("equipo1")
+    g2_real = TERCER_LUGAR_GOLES_REAL.get("equipo2")
+
+    for row in registros_tercer:
+        nombre = (row.get("nombre") or "").strip()
+        if not nombre:
+            continue
+        total = 0
+
+        if ganador_real:
+            pick = (row.get("ganador_tercer") or "").strip()
+            if pick == ganador_real:
+                total += 1
+
+        if g1_real is not None:
+            try:
+                if int(row.get("goles_equipo1")) == int(g1_real):
+                    total += 1
+            except (TypeError, ValueError):
+                pass
+
+        if g2_real is not None:
+            try:
+                if int(row.get("goles_equipo2")) == int(g2_real):
+                    total += 1
+            except (TypeError, ValueError):
+                pass
+
+        puntos[nombre] = puntos.get(nombre, 0) + total
+    return puntos
 
 
 @st.cache_data(ttl=3600)
@@ -1580,68 +1722,8 @@ if participante_seleccionado:
         elif celda in claves_camp:
             hijo_champion_flags[celda] = (archivo, pais)
 
-    st.markdown("""
-        <style>
-            div[data-testid="stRadio"] > label {
-                display: none;
-            }
-            div[data-testid="stRadio"] div[role="radiogroup"] {
-                display: flex;
-                justify-content: center;
-                gap: 2px;
-                background: linear-gradient(180deg, #1a1508, #110d04);
-                border: 1px solid #5a4520;
-                border-radius: 999px;
-                padding: 4px;
-                width: fit-content;
-                margin: 0 auto 4px auto;
-                box-shadow: inset 0 0 12px rgba(0,0,0,0.4);
-            }
-            div[data-testid="stRadio"] div[role="radiogroup"] label {
-                margin: 0 !important;
-                padding: 8px 22px !important;
-                border-radius: 999px !important;
-                color: #7a6535 !important;
-                font-family: monospace !important;
-                font-size: 11px !important;
-                letter-spacing: 1.5px;
-                text-transform: uppercase;
-                cursor: pointer;
-                border: 1px solid transparent;
-                transition: all .18s;
-            }
-            div[data-testid="stRadio"] div[role="radiogroup"] label:hover {
-                color: #d8cba8 !important;
-            }
-            div[data-testid="stRadio"] div[role="radiogroup"] label > div:first-child {
-                display: none !important;
-            }
-            div[data-testid="stRadio"] div[role="radiogroup"] label:has(input:checked) {
-                background: linear-gradient(180deg, #3a2d10, #221a08);
-                color: #f0d060 !important;
-                border: 1px solid #c8a84b;
-                box-shadow: 0 0 10px rgba(212,168,67,0.30);
-            }
-        </style>
-    """, unsafe_allow_html=True)
+    titulo_bracket = f"QUINIELA · {participante_seleccionado.upper()}"
 
-
-
-    col_a, col_b, col_c = st.columns([1, 1, 1])
-    with col_b:
-        modo_vista = st.radio(
-            "Vista del bracket",
-            options=["Predicción completa", "Resultado en tiempo real"],
-            horizontal=True,
-            label_visibility="collapsed",
-        )
-
-    usar_solo_madre = (modo_vista == "Resultado en tiempo real")
-    titulo_bracket = (
-        f"TIEMPO REAL · {participante_seleccionado.upper()}"
-        if usar_solo_madre else
-        f"QUINIELA · {participante_seleccionado.upper()}"
-    )
 
     bracket_html = construir_bracket_html(
         team_flags=hijo_team_flags,
@@ -1652,7 +1734,7 @@ if participante_seleccionado:
         champion_flags=hijo_champion_flags,
         titulo=titulo_bracket,
         resultados_madre=resultados_madre_por_celda,
-        solo_madre=usar_solo_madre,
+        solo_madre=False,
     )
 
     components.html(bracket_html, height=SVG_HEIGHT + 60, scrolling=False)
@@ -1840,6 +1922,180 @@ if participante_seleccionado:
             html = construir_tabla_detalle_html(titulo_tabla, subtitulo_tabla, tabla_bloque,
                                                 ocultar_columnas=["col-celda"])
         return html, altura
+
+    # ── Helper: tabla "¿Quién gana Tercer Lugar?" ─────────────────────
+    # OJO: esta tabla NO usa Quiniela_Fase2 como las demás. El dato del
+    # participante viene de la tabla de Supabase 3erLugar_Quiniela
+    # (el mismo registro que llena el PANEL TERCER LUGAR más abajo).
+    def _tabla_tercer_ganador(registro, ganador_real, titulo_tabla, subtitulo_tabla):
+        if registro:
+            pick = (registro.get("ganador_tercer") or "").strip()
+            if ganador_real:
+                acerto = (pick == ganador_real.strip())
+                est = (
+                    '<span class="badge-ok">✓ Acierto</span>' if acerto
+                    else '<span class="badge-fail">✗ Falló</span>'
+                )
+                p_html = f'{pick} <span class="madre-ref">(real: {ganador_real})</span>'
+                total_ac, total_con = (1 if acerto else 0), 1
+            else:
+                est, p_html = '<span class="madre-ref">Pendiente</span>', pick
+                total_ac, total_con = 0, 0
+            filas_html = f"""
+            <tr class="quiniela-row">
+                <td class="col-num">1</td>
+                <td class="col-celda">3L</td>
+                <td class="col-pais">{p_html}</td>
+                <td class="col-estado">{est}</td>
+            </tr>"""
+            footer = (
+                f'<tfoot><tr class="quiniela-footer">'
+                f'<td colspan="3" class="footer-label">Total de aciertos</td>'
+                f'<td class="footer-valor">{total_ac}/{total_con}</td>'
+                f'</tr></tfoot>'
+            )
+            tabla_bloque = f"""
+            <table class="quiniela-table">
+                <thead><tr>
+                    <th>#</th><th class="col-celda">Celda</th>
+                    <th>País</th><th>Estado</th>
+                </tr></thead>
+                <tbody>{filas_html}</tbody>
+                {footer}
+            </table>"""
+            altura = 280 + 44
+        else:
+            tabla_bloque = (
+                '<div class="empty-state">Aún no registraste tu pronóstico '
+                'del Tercer Lugar.</div>'
+            )
+            altura = 260
+        html = construir_tabla_detalle_html(titulo_tabla, subtitulo_tabla, tabla_bloque,
+                                             ocultar_columnas=["col-celda"])
+        return html, altura
+
+    # ── Helper: tabla "Goles Tercer Lugar" ────────────────────────────
+    # OJO: misma fuente distinta que la de arriba → 3erLugar_Quiniela.
+    def _tabla_tercer_goles(registro, goles_real, titulo_tabla, subtitulo_tabla):
+        if registro:
+            filas = [
+                ("3L1", _nombre_t1, registro.get("goles_equipo1"), goles_real.get("equipo1")),
+                ("3L2", _nombre_t2, registro.get("goles_equipo2"), goles_real.get("equipo2")),
+            ]
+            filas_html = ""
+            total_ac, total_con = 0, 0
+            for i, (celda, pais, goles_p, goles_r) in enumerate(filas, start=1):
+                goles_r_html = (
+                    goles_r if goles_r is not None and goles_r != ""
+                    else '<span class="madre-ref">—</span>'
+                )
+                comp_html, cuenta, acerto = comparar_goles(goles_p, goles_r)
+                if cuenta:
+                    total_con += 1
+                    if acerto:
+                        total_ac += 1
+                filas_html += f"""
+                <tr class="quiniela-row">
+                    <td class="col-num">{i}</td>
+                    <td class="col-celda">{celda}</td>
+                    <td class="col-pais">{pais}</td>
+                    <td class="col-goles">{goles_p}</td>
+                    <td class="col-goles-madre">{goles_r_html}</td>
+                    <td class="col-comparacion">{comp_html}</td>
+                </tr>"""
+            footer = (
+                f'<tfoot><tr class="quiniela-footer">'
+                f'<td colspan="4" class="footer-label">Total de aciertos</td>'
+                f'<td class="footer-valor">{total_ac}/{total_con}</td>'
+                f'</tr></tfoot>'
+            )
+            tabla_bloque = f"""
+            <table class="quiniela-table">
+                <thead><tr>
+                    <th>#</th><th class="col-celda">Celda</th>
+                    <th>País</th><th>Goles P</th><th>Goles R</th>
+                    <th>Comparación</th>
+                </tr></thead>
+                <tbody>{filas_html}</tbody>
+                {footer}
+            </table>"""
+            altura = 280 + 2 * 44
+        else:
+            tabla_bloque = (
+                '<div class="empty-state">Aún no registraste tu pronóstico '
+                'del Tercer Lugar.</div>'
+            )
+            altura = 260
+        html = construir_tabla_detalle_html(titulo_tabla, subtitulo_tabla, tabla_bloque,
+                                             ocultar_columnas=["col-celda"])
+        return html, altura
+
+    # ════════════════════════════════════════════════════════════════
+    #  VISIBILIDAD MANUAL — cuando quieras lanzar cada tabla, cambia
+    #  la variable correspondiente a True.
+    # ════════════════════════════════════════════════════════════════
+    CAMPEON_TABLA_VISIBLE = False       # ← "¿Quién ganó la Copa del Mundo?"
+    GOLES_FINAL_TABLA_VISIBLE = False   # ← "Goles Final"
+
+    # ════════════════════════════════════════════════════════════════
+    #  TABLA "¿QUIÉN GANÓ LA COPA DEL MUNDO?" — clon de
+    #  "¿Quién pasa a la Gran Final?" (misma fuente: Quiniela_Fase2)
+    # ════════════════════════════════════════════════════════════════
+    if CAMPEON_TABLA_VISIBLE:
+        html_campeon, alt_campeon = _tabla_pais(
+            filas_data=datos,
+            clave_set=claves_camp,                 # ← celda W1 (campeón)
+            titulo_tabla="Campeón del Mundo",
+            subtitulo_tabla="Verde = acierto vs. resultado real &middot; Rojo = no coincide",
+            resultados_ref=resultados_madre_por_celda,
+            acordeon=False,
+        )
+        st.components.v1.html(html_campeon, height=alt_campeon, scrolling=False)
+
+    # ════════════════════════════════════════════════════════════════
+    #  TABLA "GOLES FINAL" — clon de "Goles Semifinales"
+    #  (misma fuente: Quiniela_Fase2)
+    # ════════════════════════════════════════════════════════════════
+    if GOLES_FINAL_TABLA_VISIBLE:
+        html_goles_final, alt_goles_final = _tabla_goles(
+            filas_data=datos,
+            clave_set=claves_fin,                  # ← celdas S1, S2 (final)
+            goles_ref=goles_madre_final,
+            titulo_tabla="GOLES FINAL",
+            subtitulo_tabla="Verde = goles exactos &middot; Rojo = no coincide",
+            acordeon=False,
+            validar_pais={celda: info[1] for celda, info in madre_final_flags.items()},
+        )
+        st.components.v1.html(html_goles_final, height=alt_goles_final, scrolling=False)
+
+    # ════════════════════════════════════════════════════════════════
+    #  TABLA "¿QUIÉN GANA TERCER LUGAR?" — SIEMPRE VISIBLE
+    #  OJO: fuente distinta → tabla 3erLugar_Quiniela de Supabase,
+    #  NO Quiniela_Fase2 como todas las demás.
+    # ════════════════════════════════════════════════════════════════
+    _registro_tercer_lugar = _obtener_registro_tercer_lugar(participante_seleccionado)
+
+    html_tercer_ganador, alt_tercer_ganador = _tabla_tercer_ganador(
+        registro=_registro_tercer_lugar,
+        ganador_real=TERCER_LUGAR_GANADOR_REAL,
+        titulo_tabla="¿QUIÉN GANA TERCER LUGAR?",
+        subtitulo_tabla="Verde = acierto vs. resultado real &middot; Rojo = no coincide",
+    )
+    st.components.v1.html(html_tercer_ganador, height=alt_tercer_ganador, scrolling=False)
+
+    # ════════════════════════════════════════════════════════════════
+    #  TABLA "GOLES TERCER LUGAR" — SIEMPRE VISIBLE
+    #  OJO: misma fuente distinta que la de arriba → 3erLugar_Quiniela.
+    # ════════════════════════════════════════════════════════════════
+    html_tercer_goles, alt_tercer_goles = _tabla_tercer_goles(
+        registro=_registro_tercer_lugar,
+        goles_real=TERCER_LUGAR_GOLES_REAL,
+        titulo_tabla="GOLES TERCER LUGAR",
+        subtitulo_tabla="Verde = goles exactos &middot; Rojo = no coincide",
+    )
+    st.components.v1.html(html_tercer_goles, height=alt_tercer_goles, scrolling=False)
+
+    # ── A partir de aquí, tablas viejas — se mantienen en el mismo orden ──
 
     # ════════════════════════════════════════════════════════════════
     #  TABLA "QUIEN PASA A FINALES?" — clon de "Quién pasa a Semifinales"
@@ -2669,6 +2925,545 @@ if bonus_visible:
 
         st.markdown('</div>', unsafe_allow_html=True)  # cierra .bonus-panel
 
+
+# ════════════════════════════════════════════════════════════════════
+#  PANEL TERCER LUGAR  (3erLugar_Quiniela)
+# ════════════════════════════════════════════════════════════════════
+# Segmento de ingreso de datos para el partido por el Tercer Lugar.
+# Sigue el mismo patrón que el PANEL BONUS: variables de configuración
+# arriba, funciones de envío a Supabase, estado de sesión y luego el
+# render por pasos que se van desbloqueando uno a uno.
+#
+# CÓMO CONFIGURAR:
+#   TERCER_EQUIPO1 / TERCER_EQUIPO2  → definidos arriba de todo, junto a
+#                                       resultados_madre_por_celda, para
+#                                       compartirse con las tablas de stats
+#   TERCER_LUGAR_VISIBLE             → True = visible / False = oculto
+# ─────────────────────────────────────────────────────────────────────
+
+# ── Visibilidad manual ───────────────────────────────────────────────
+TERCER_LUGAR_VISIBLE = True
+
+# ── Datos de los equipos (nombres ya vienen de la config compartida) ──
+_b64_t1 = _bandera_b64(TERCER_EQUIPO1)
+_b64_t2 = _bandera_b64(TERCER_EQUIPO2)
+
+
+def _tercer_lugar_ya_registrado(nombre_participante):
+    """True si ese nombre ya tiene una fila en 3erLugar_Quiniela."""
+    headers = {
+        "apikey": SUPABASE_KEY,
+        "Authorization": f"Bearer {SUPABASE_KEY}",
+    }
+    nombre_enc = urllib.parse.quote(nombre_participante.strip(), safe="")
+    url = (
+        f"{SUPABASE_URL}/rest/v1/3erLugar_Quiniela"
+        f"?select=id&nombre=eq.{nombre_enc}&limit=1"
+    )
+    try:
+        r = requests.get(url, headers=headers, timeout=8)
+        r.raise_for_status()
+        return len(r.json()) > 0
+    except Exception:
+        return False
+
+
+def _enviar_tercer_lugar(nombre_participante, ganador, goles1, goles2):
+    """Inserta un registro en la tabla 3erLugar_Quiniela de Supabase."""
+    headers = {
+        "apikey": SUPABASE_KEY,
+        "Authorization": f"Bearer {SUPABASE_KEY}",
+        "Content-Type": "application/json",
+        "Prefer": "return=minimal",
+    }
+    payload = {
+        "nombre":         nombre_participante,
+        "equipo1":        _nombre_t1,
+        "equipo2":        _nombre_t2,
+        "goles_equipo1":  int(goles1),
+        "goles_equipo2":  int(goles2),
+        "ganador_tercer": ganador,
+    }
+    try:
+        resp = requests.post(
+            f"{SUPABASE_URL}/rest/v1/3erLugar_Quiniela",
+            headers=headers,
+            json=payload,
+            timeout=8,
+        )
+        return resp.status_code in (200, 201)
+    except Exception:
+        return False
+
+
+# ── Estado de sesión ─────────────────────────────────────────────────
+if "tercer_nombre"  not in st.session_state: st.session_state.tercer_nombre  = None
+if "tercer_ganador" not in st.session_state: st.session_state.tercer_ganador = None
+# Los goles inician en 0 (no en None) para que el botón ENVIAR quede
+# activo desde que aparecen los inputs, sin esperar a que el usuario
+# haga clic fuera del campo para "confirmar" el valor.
+if "tercer_goles1"  not in st.session_state: st.session_state.tercer_goles1  = 0
+if "tercer_goles2"  not in st.session_state: st.session_state.tercer_goles2  = 0
+if "tercer_enviado" not in st.session_state: st.session_state.tercer_enviado = False
+if "tercer_mostrar_opciones" not in st.session_state: st.session_state.tercer_mostrar_opciones = False
+
+# ── Solo renderizamos el panel si TERCER_LUGAR_VISIBLE = True ────────
+if TERCER_LUGAR_VISIBLE:
+
+    _, col_tercer, _ = st.columns([1, 2, 1])
+
+    with col_tercer:
+
+        # ── CSS del panel ────────────────────────────────────────────
+        st.markdown("""
+        <style>
+        .tercer-panel {
+            background: linear-gradient(180deg, #110d04 0%, #0a0a0a 100%);
+            border: 1px solid #3a2e10;
+            border-radius: 12px;
+            padding: 10px 20px 16px 20px;
+            margin-bottom: 18px;
+        }
+        .tercer-title {
+            text-align: center;
+            color: #d4a843;
+            font-family: 'Georgia', serif;
+            font-size: 14px;
+            letter-spacing: 4px;
+            text-transform: uppercase;
+            margin-bottom: 6px;
+        }
+        .tercer-subtitle {
+            text-align: center;
+            color: #7a6535;
+            font-family: monospace;
+            font-size: 10px;
+            letter-spacing: 1px;
+            margin-bottom: 14px;
+        }
+        .tercer-divider {
+            width: 80px;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, #c8a84b, transparent);
+            margin: 0 auto 20px auto;
+        }
+        /* Fila de los 3 círculos: izquierdo - central (selector) - derecho */
+        div.st-key-tercer_fila div[data-testid="stHorizontalBlock"] {
+            align-items: center !important;
+        }
+        /* Se cambió object-fit por background-size: cover para llenar el círculo */
+        .tercer-circle {
+            position: relative;
+            z-index: 1;
+            border-radius: 50%;
+            background-color: #0a0a0a;
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 0 auto;
+        }
+        .tercer-circle-side {
+            width: 54px;
+            height: 54px;
+            border: 2px solid #5a4520;
+            opacity: 0.85;
+        }
+        /* Nombre debajo de cada círculo lateral: va dentro de la MISMA
+           columna que el círculo, así quedan alineados verticalmente
+           sin importar el ancho real de la columna. */
+        .tercer-name-side {
+            color: #7a6535;
+            font-family: monospace;
+            font-size: 10px;
+            letter-spacing: 1px;
+            text-align: center;
+            margin-top: 8px;
+        }
+        .tercer-name-center {
+            color: #d4a843;
+            font-family: monospace;
+            font-size: 10px;
+            letter-spacing: 1px;
+            text-align: center;
+            text-transform: uppercase;
+            margin-top: 8px;
+        }
+        /* ── Círculo central: botón "?" y círculo ya cerrado (con ganador) ──
+           Antes era un st.popover; se reemplazó por control 100% en Python
+           para que se cierre al instante al elegir equipo. */
+        div.st-key-tercer_popover {
+            display: flex !important;
+            flex-direction: column !important;
+            align-items: center !important;
+        }
+        div.st-key-tercer_popover > div > div[data-testid="stButton"]:first-of-type > button {
+            width: 92px !important;
+            height: 92px !important;
+            box-sizing: border-box !important;
+            border-radius: 50% !important;
+            border: 3px solid #d4a843 !important;
+            box-shadow: 0 0 14px rgba(212,168,67,0.35) !important;
+            background-color: #0a0a0a !important;
+            padding: 0 !important;
+            min-width: unset !important;
+            color: #5a4520 !important;
+            font-family: 'Georgia', serif !important;
+            font-size: 28px !important;
+            transition: all .18s !important;
+        }
+        div.st-key-tercer_popover > div > div[data-testid="stButton"]:first-of-type > button:hover {
+            border-color: #f0d060 !important;
+            box-shadow: 0 0 18px rgba(240,208,96,0.5) !important;
+            color: #f0d060 !important;
+        }
+        .tercer-circle-central {
+            width: 92px;
+            height: 92px;
+            box-sizing: border-box;
+            border-radius: 50%;
+            border: 3px solid #d4a843;
+            box-shadow: 0 0 14px rgba(212,168,67,0.35);
+            background-color: #0a0a0a;
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto;
+            font-size: 28px;
+        }
+        .tercer-pregunta {
+            color: #d4a843 !important;
+            font-family: monospace !important;
+            font-size: 11px !important;
+            text-align: center !important;
+            letter-spacing: 1px !important;
+            text-transform: uppercase !important;
+            margin-bottom: 6px !important;
+        }
+        .tercer-label {
+            text-align: center;
+            color: #7a6535;
+            font-family: monospace;
+            font-size: 11px;
+            letter-spacing: 2px;
+            margin: 16px 0 6px 0;
+            text-transform: uppercase;
+        }
+        .tercer-team-label {
+            text-align: center;
+            color: #d8cba8;
+            font-family: monospace;
+            font-size: 11px;
+            margin-bottom: 4px;
+        }
+        .tercer-vs {
+            text-align: center;
+            color: #7a6535;
+            font-family: monospace;
+            font-size: 16px;
+            padding-top: 28px;
+        }
+        .tercer-hint {
+            text-align: center;
+            color: #5a4520;
+            font-family: monospace;
+            font-size: 10px;
+            letter-spacing: 1px;
+            margin-top: 10px;
+        }
+        .tercer-ok {
+            text-align: center;
+            color: #3ddc6e;
+            font-family: monospace;
+            font-size: 11px;
+            margin-top: 8px;
+            padding: 8px;
+            border: 1px solid #2a8a4a;
+            border-radius: 6px;
+            background: rgba(61,220,110,0.07);
+        }
+        .tercer-err {
+            text-align: center;
+            color: #e0473e;
+            font-family: monospace;
+            font-size: 11px;
+            margin-top: 8px;
+            padding: 6px;
+            border: 1px solid #8a2a24;
+            border-radius: 6px;
+            background: rgba(224,71,62,0.07);
+        }
+        /* Botones, selects y radios centrados y con el mismo estilo del sitio */
+        div[data-testid="stButton"],
+        .stButton {
+            display: flex !important;
+            justify-content: center !important;
+            width: 100% !important;
+        }
+        div[data-testid="element-container"]:has(div[data-testid="stButton"]) {
+            display: flex !important;
+            justify-content: center !important;
+        }
+        div[data-testid="stButton"] > button,
+        .stButton > button {
+            background: linear-gradient(180deg, #1e1608, #110d04) !important;
+            color: #d4a843 !important;
+            border: 1px solid #5a4520 !important;
+            border-radius: 8px !important;
+            font-family: monospace !important;
+            letter-spacing: 2px !important;
+            font-size: 12px !important;
+            width: auto !important;
+            min-width: 180px !important;
+            padding: 10px 20px !important;
+            transition: all 0.15s !important;
+            margin: 0 auto !important;
+        }
+        div[data-testid="stButton"] > button:hover,
+        .stButton > button:hover {
+            border-color: #c8a84b !important;
+            color: #f0d060 !important;
+            background: linear-gradient(180deg, #2a1e08, #160f04) !important;
+        }
+        div[data-testid="stSelectbox"] > div > div {
+            background: #110d04 !important;
+            border: 1px solid #3a2e10 !important;
+            color: #d8cba8 !important;
+            font-family: monospace !important;
+            border-radius: 8px !important;
+        }
+        
+        /* ── ESTILO PARA REDUCIR Y CENTRAR LOS INPUTS DE GOLES ── */
+        div[data-testid="stNumberInput"] {
+            display: flex !important;
+            justify-content: center !important;
+            width: 100% !important;
+            margin-bottom: 5px !important;
+            
+        }
+        div[data-testid="stNumberInput"] > div {
+            width: 150px !important;  /* Ancho fijo reducido del input */
+            min-width: 70px !important;
+        }
+        
+        
+        </style>
+        """, unsafe_allow_html=True)
+
+        # ── Cuerpo del panel ─────────────────────────────────────────
+        st.markdown('<div class="tercer-panel">', unsafe_allow_html=True)
+        st.markdown('<div class="tercer-title">Tercer Lugar</div>', unsafe_allow_html=True)
+        st.markdown(
+            '<div class="tercer-subtitle">Pronóstico del partido por el Tercer Lugar 18/07 Sábado 15:00hrs</div>',
+            unsafe_allow_html=True,
+        )
+        st.markdown('<div class="tercer-divider"></div>', unsafe_allow_html=True)
+
+        if st.session_state.tercer_enviado:
+            _ganador_ok = st.session_state.tercer_ganador or ""
+            _resumen = ""
+            if st.session_state.tercer_goles1 is not None and st.session_state.tercer_goles2 is not None:
+                _resumen = (
+                    f" · {int(st.session_state.tercer_goles1)}–"
+                    f"{int(st.session_state.tercer_goles2)}"
+                )
+            st.markdown(
+                f'<div class="tercer-ok">✓ Pronóstico registrado<br/>'
+                f'<span style="opacity:.7">'
+                f'{st.session_state.tercer_nombre or ""} · {_ganador_ok} ganador'
+                f'{_resumen}</span></div>',
+                unsafe_allow_html=True,
+            )
+        else:
+            # ── PASO 1: SELECCIONAR PARTICIPANTE (siempre desbloqueado) ──
+            _lista_tercer = obtener_participantes() or []
+            _seleccion_tercer = st.selectbox(
+                "Selecciona tu nombre",
+                options=["Selecciona tu nombre para participar (Clic aquí)"] + _lista_tercer,
+                key="tercer_select_nombre",
+                label_visibility="collapsed",
+            )
+            st.session_state.tercer_nombre = (
+                _seleccion_tercer if _seleccion_tercer != "Selecciona tu nombre para participar (Clic aquí)" else None
+            )
+
+            if st.session_state.tercer_nombre:
+
+                # Si ese participante ya tiene un registro previo en la
+                # tabla, lo bloqueamos para que no vuelva a enviar.
+                if _tercer_lugar_ya_registrado(st.session_state.tercer_nombre):
+                    st.session_state.tercer_enviado = True
+                    st.rerun()
+
+                # ── PASO 2: LOS 3 CÍRCULOS + SELECTOR DE GANADOR ──────
+                # El círculo central ES el selector: al hacer clic se abre
+                # un popover con las dos banderas (Francia / Inglaterra).
+                _flag_izq = (
+                    f'<div class="tercer-circle tercer-circle-side" style="background-image: url(\'{_b64_t1}\');"></div>'
+                    if _b64_t1 else '<div class="tercer-circle tercer-circle-side">🏳</div>'
+                )
+                _flag_der = (
+                    f'<div class="tercer-circle tercer-circle-side" style="background-image: url(\'{_b64_t2}\');"></div>'
+                    if _b64_t2 else '<div class="tercer-circle tercer-circle-side">🏳</div>'
+                )
+
+                with st.container(key="tercer_fila", border=False):
+                    _tc1, _tc2, _tc3 = st.columns([1, 1, 1])
+                    with _tc1:
+                        st.markdown(_flag_izq, unsafe_allow_html=True)
+                        st.markdown(
+                            f'<div class="tercer-name-side">{_nombre_t1}</div>',
+                            unsafe_allow_html=True,
+                        )
+                    with _tc2:
+                        with st.container(key="tercer_popover", border=False):
+                            if st.session_state.tercer_ganador:
+                                # Ya hay ganador: mostramos el círculo "cerrado"
+                                # con la bandera del ganador de fondo.
+                                _bg_ganador = (
+                                    _b64_t1 if st.session_state.tercer_ganador == _nombre_t1
+                                    else _b64_t2
+                                )
+                                st.markdown(
+                                    (
+                                        f'<div class="tercer-circle-central" '
+                                        f'style="background-image: url(\'{_bg_ganador}\');"></div>'
+                                    ) if _bg_ganador else
+                                    '<div class="tercer-circle-central">🏆</div>',
+                                    unsafe_allow_html=True,
+                                )
+                            elif not st.session_state.tercer_mostrar_opciones:
+                                # Círculo central = botón "?" que abre las opciones
+                                if st.button(
+                                    "?",
+                                    key="tercer_abrir_selector",
+                                    use_container_width=False,
+                                ):
+                                    st.session_state.tercer_mostrar_opciones = True
+                                    st.rerun()
+                            else:
+                                # Opciones visibles: se cierran de inmediato al
+                                # elegir (no dependen de un popover del navegador)
+                                st.markdown(
+                                    '<p class="tercer-pregunta">¿Quién gana el Tercer Lugar?</p>',
+                                    unsafe_allow_html=True,
+                                )
+                                _pc1, _pc2 = st.columns(2)
+                                with _pc1:
+                                    if st.button(
+                                        _nombre_t1,
+                                        key="tercer_pick_eq1",
+                                        use_container_width=True,
+                                    ):
+                                        st.session_state.tercer_ganador = _nombre_t1
+                                        st.session_state.tercer_mostrar_opciones = False
+                                        st.rerun()
+                                with _pc2:
+                                    if st.button(
+                                        _nombre_t2,
+                                        key="tercer_pick_eq2",
+                                        use_container_width=True,
+                                    ):
+                                        st.session_state.tercer_ganador = _nombre_t2
+                                        st.session_state.tercer_mostrar_opciones = False
+                                        st.rerun()
+                        st.markdown(
+                            '<div class="tercer-name-center">Ganador</div>',
+                            unsafe_allow_html=True,
+                        )
+                    with _tc3:
+                        st.markdown(_flag_der, unsafe_allow_html=True)
+                        st.markdown(
+                            f'<div class="tercer-name-side">{_nombre_t2}</div>',
+                            unsafe_allow_html=True,
+                        )
+
+                # ── PASO 3: INPUTS DE GOLES (solo si ya hay ganador) ──
+                if st.session_state.tercer_ganador:
+                    st.markdown('<div class="tercer-label">Pronóstico de goles</div>', unsafe_allow_html=True)
+                    _tgc1, _tgv, _tgc2 = st.columns([2, 1, 2])
+
+                    with _tgc1:
+                        st.markdown(
+                            f'<div class="tercer-team-label">{_nombre_t1}</div>',
+                            unsafe_allow_html=True,
+                        )
+                        # min_value=None permite que el input esté vacío y no muestre 0
+                        _goles1 = st.number_input(
+                            label=_nombre_t1,
+                            min_value=None, 
+                            max_value=30,
+                            value=st.session_state.tercer_goles1,
+                            step=1, key="tercer_input_goles1",
+                            label_visibility="collapsed",
+                        )
+                        st.session_state.tercer_goles1 = _goles1
+
+                    with _tgv:
+                        st.markdown('<div class="tercer-vs">VS</div>', unsafe_allow_html=True)
+
+                    with _tgc2:
+                        st.markdown(
+                            f'<div class="tercer-team-label">{_nombre_t2}</div>',
+                            unsafe_allow_html=True,
+                        )
+                        _goles2 = st.number_input(
+                            label=_nombre_t2,
+                            min_value=None, 
+                            max_value=30,
+                            value=st.session_state.tercer_goles2,
+                            step=1, key="tercer_input_goles2",
+                            label_visibility="collapsed",
+                        )
+                        st.session_state.tercer_goles2 = _goles2
+
+                    # ── PASO 4: ENVIAR (solo si TODO está completo) ───
+                    # Validación: los valores no deben ser None y deben ser >= 0
+                    _datos_completos = (
+                        st.session_state.tercer_nombre is not None
+                        and st.session_state.tercer_ganador is not None
+                        and st.session_state.tercer_goles1 is not None
+                        and st.session_state.tercer_goles2 is not None
+                        and st.session_state.tercer_goles1 >= 0
+                        and st.session_state.tercer_goles2 >= 0
+                    )
+
+                    if _datos_completos:
+                        _tbl, _tbm, _tbr = st.columns([1, 2, 1])
+                        with _tbm:
+                            if st.button(
+                                "✓ ENVIAR",
+                                key="btn_tercer_enviar",
+                                use_container_width=True,
+                            ):
+                                _ok = _enviar_tercer_lugar(
+                                    st.session_state.tercer_nombre,
+                                    st.session_state.tercer_ganador,
+                                    st.session_state.tercer_goles1,
+                                    st.session_state.tercer_goles2,
+                                )
+                                if _ok:
+                                    st.session_state.tercer_enviado = True
+                                    st.rerun()
+                                else:
+                                    st.markdown(
+                                        '<div class="tercer-err">Error al registrar tu '
+                                        'pronóstico. Intenta de nuevo.</div>',
+                                        unsafe_allow_html=True,
+                                    )
+                    else:
+                        st.markdown(
+                            '<div class="tercer-hint">Completa ambos marcadores para continuar</div>',
+                            unsafe_allow_html=True,
+                        )
+
+        st.markdown('</div>', unsafe_allow_html=True)  # cierra .tercer-panel
+
 # ════════════════════════════════════════════════════════════════════
 #  TABLA DE PARTICIPANTES (con aciertos y ordenación)
 # ════════════════════════════════════════════════════════════════════
@@ -2677,15 +3472,26 @@ participantes = obtener_participantes()
 if participantes:
     todos_registros = obtener_todos_los_registros()
     registros_bonus = obtener_registros_bonus()
+    registros_tercer_lugar = obtener_registros_tercer_lugar()
     aciertos_por_participante = calcular_aciertos_por_participante(todos_registros)
     puntos_bonus_por_participante, _detalle_bonus_por_participante = calcular_puntos_bonus_todos(
         registros_bonus, todos_registros
+    )
+    puntos_tercer_lugar_por_participante = calcular_puntos_tercer_lugar_todos(
+        registros_tercer_lugar
     )
 
     # Los puntos de bonus se suman al total de aciertos de cada participante
     for _nombre_bonus, _pts_bonus in puntos_bonus_por_participante.items():
         aciertos_por_participante[_nombre_bonus] = (
             aciertos_por_participante.get(_nombre_bonus, 0) + _pts_bonus
+        )
+
+    # Los puntos de Tercer Lugar (fuente distinta: 3erLugar_Quiniela) también
+    # se suman al total general de aciertos de cada participante
+    for _nombre_tercer, _pts_tercer in puntos_tercer_lugar_por_participante.items():
+        aciertos_por_participante[_nombre_tercer] = (
+            aciertos_por_participante.get(_nombre_tercer, 0) + _pts_tercer
         )
 
     participantes_ordenados = sorted(
