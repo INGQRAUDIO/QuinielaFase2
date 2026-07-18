@@ -2942,7 +2942,7 @@ if bonus_visible:
 # ─────────────────────────────────────────────────────────────────────
 
 # ── Visibilidad manual ───────────────────────────────────────────────
-TERCER_LUGAR_VISIBLE = True
+TERCER_LUGAR_VISIBLE = False  # True = visible / False = oculto
 
 # ── Datos de los equipos (nombres ya vienen de la config compartida) ──
 _b64_t1 = _bandera_b64(TERCER_EQUIPO1)
