@@ -2034,8 +2034,8 @@ if participante_seleccionado:
     #  VISIBILIDAD MANUAL — cuando quieras lanzar cada tabla, cambia
     #  la variable correspondiente a True.
     # ════════════════════════════════════════════════════════════════
-    CAMPEON_TABLA_VISIBLE = False       # ← "¿Quién ganó la Copa del Mundo?"
-    GOLES_FINAL_TABLA_VISIBLE = False   # ← "Goles Final"
+    CAMPEON_TABLA_VISIBLE = True       # ← "¿Quién ganó la Copa del Mundo?"
+    GOLES_FINAL_TABLA_VISIBLE = True   # ← "Goles Final"
 
     # ════════════════════════════════════════════════════════════════
     #  TABLA "¿QUIÉN GANÓ LA COPA DEL MUNDO?" — clon de
