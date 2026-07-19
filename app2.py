@@ -719,7 +719,7 @@ resultados_madre_por_celda = _construir_resultados_madre()
 TERCER_EQUIPO1 = "fr"        # ← equipo 1 (Francia) — círculo izquierdo
 TERCER_EQUIPO2 = "gb-eng"    # ← equipo 2 (Inglaterra) — círculo derecho
 
-TERCER_LUGAR_GANADOR_REAL = "Francia"    # ← poner el nombre del ganador real cuando se sepa
+TERCER_LUGAR_GANADOR_REAL = "Inglaterra"    # ← poner el nombre del ganador real cuando se sepa
 TERCER_LUGAR_GOLES_REAL = {
     "equipo1": 4,   # ← goles reales del equipo 1 (Francia)
     "equipo2": 6,   # ← goles reales del equipo 2 (Inglaterra)
