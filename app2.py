@@ -607,7 +607,9 @@ madre_final_flags = {
     "S1": ("es.svg", "España"),
     "S2": ("ar.svg", "Argentina")
 }
-madre_champion_flags = {}
+madre_champion_flags = {
+    "W1": ("es.svg", "España")
+}
 
 # ── Goles de la rueda madre ─────────────────────────────────────────
 goles_madre_r32 = {
@@ -650,7 +652,7 @@ goles_madre_sf = {
     "B15": 1, "D15": 2
 }
 goles_madre_final = {
-    #"S1": 2, "S2": 1
+    "S1": 1, "S2": 0
 }
 goles_madre_champion = {}
 
